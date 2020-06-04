@@ -30,12 +30,18 @@
     <ClInclude Include="windesign.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="sizebox.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="application-test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="windesign.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sizebox.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

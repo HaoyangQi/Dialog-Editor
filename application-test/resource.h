@@ -14,6 +14,7 @@
 #define IDI_APPLICATIONTEST             107
 #define IDS_TARGET_LAYER_TITLE          107
 #define IDI_SMALL                       108
+#define IDC_SIZE_BOX                    108
 #define IDC_APPLICATIONTEST             109
 #define IDR_MAINFRAME                   128
 #define IDC_CUR_MAIN                    129

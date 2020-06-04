@@ -1,5 +1,6 @@
 #include "framework.h"
 #include "windesign.h"
+#include "sizebox.h"
 
 static HINSTANCE appInstance;
 static WCHAR szDesignerWindowClass[MAX_LOADSTRING];
@@ -40,6 +41,7 @@ BOOL InitWindowDesignerInstance(HINSTANCE hInstance, HWND hParent, int nCmdShow)
         return FALSE;
     }
 
+    // this part needs to go WM_CREATE message
     hwndMain = CreateWindowEx(WS_EX_CLIENTEDGE, szDesignerWindowClass, NULL,
         WS_BORDER | WS_CHILD,
         0, 0, 400, 400, hParent, NULL, appInstance, NULL);
@@ -52,6 +54,10 @@ BOOL InitWindowDesignerInstance(HINSTANCE hInstance, HWND hParent, int nCmdShow)
     hwndDesign = CreateWindowEx(WS_EX_TOPMOST | WS_EX_TRANSPARENT, szDesignLayerClass, NULL,
         WS_CHILD,
         0, 0, 400, 400, hwndMain, NULL, appInstance, NULL);
+
+    if (!InitSizeBoxInstance(appInstance, hwndDesign, nCmdShow)) {
+        return FALSE;
+    }
 
     if (!hwndMain || !hwndTarget || !hwndDesign) {
         return FALSE;
@@ -179,6 +185,12 @@ LRESULT CALLBACK DesignTargetWndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
 {
     switch (message)
     {
+    case WM_CREATE:
+    {
+        CreateWindow(L"BUTTON", L"Test", WS_VISIBLE | WS_CHILD,
+            100, 100, 100, 20, hWnd, NULL, appInstance, nullptr);
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
     case WM_COMMAND:
     {
         int wmId = LOWORD(wParam);
