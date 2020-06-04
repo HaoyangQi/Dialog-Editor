@@ -1,0 +1,13 @@
+#pragma once
+
+#include "resource.h"
+
+#define IDC_BTN_MOVE_LEFT 110
+#define IDC_BTN_MOVE_RIGHT 111
+#define IDC_BTN_MOVE_UP 112
+#define IDC_BTN_MOVE_DOWN 113
+#define IDC_BTN_INC_WIDTH 114
+#define IDC_BTN_DEC_WIDTH 115
+#define IDC_BTN_INC_HEIGHT 116
+#define IDC_BTN_DEC_HEIGHT 117
+#define IDC_BTN_IVALIDATE 118
