@@ -39,16 +39,16 @@ size_t getTemplateSizeAligned(DIALOG_TEMPLATE_DATA* pdtd)
 	s += 26; // first 10 fields
 
 	s = alignToWORD(s, NULL);
-	s += pdtd->size_class * sizeof(WCHAR);
+	s += pdtd->size_class;
 	s = alignToWORD(s, NULL);
-	s += pdtd->size_menu * sizeof(WCHAR);
+	s += pdtd->size_menu;
 	s = alignToWORD(s, NULL);
-	s += pdtd->size_title * sizeof(WCHAR);
+	s += pdtd->size_title;
 	
 	if (pdtd->style & DS_SETFONT || pdtd->style & DS_SHELLFONT) {
 		s += 6; // 4 fields for fonts
 		s = alignToWORD(s, NULL);
-		s += pdtd->size_typeface * sizeof(WCHAR);
+		s += pdtd->size_typeface;
 	}
 
 	if (pdtd->cDlgItems != 0) {
@@ -58,9 +58,9 @@ size_t getTemplateSizeAligned(DIALOG_TEMPLATE_DATA* pdtd)
 
 			s += 24; // 8 fields
 			s = alignToWORD(s, NULL);
-			s += pItem->size_class * sizeof(WCHAR);
+			s += pItem->size_class;
 			s = alignToWORD(s, NULL);
-			s += pItem->size_title * sizeof(WCHAR);
+			s += pItem->size_title;
 			s += 2;
 
 			if (pItem->extraCount > 0) {

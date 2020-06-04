@@ -28,7 +28,7 @@ aligned = ((addr + 3) >> 2) << 2
 
 ### WORD Alignment
 
-All length-varying data (string, creation data) are encoded in UNCODE, and they are aligned on WORD boundary.
+All length-varying data (string, creation data) are encoded in UNICODE, and they are aligned on WORD boundary.
 
 The first bit (LSB) is enough to determine the size of padding (0 or 1 byte):
 ```
