@@ -7,10 +7,7 @@ static HWND hwndMain, hwndTarget;
 static HWND hStatic; // DEBUG ONLY
 static size_t sizeControlPoint = 5;
 static SIZE_BOX_DATA boxHandles[8];
-static int positionType; // POS_XXX
-// drag
-static BOOL bBeginDrag;
-static POINT ptDragBefore, ptCurrent;
+static DRAG_HANDLE_POSITION positionType; // POS_XXX
 
 ATOM RegisterSizeBoxClass(HINSTANCE hInstance);
 LRESULT CALLBACK SizeBoxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -33,11 +30,11 @@ BOOL InitSizeBoxInstance(HINSTANCE hInstance, HWND hParent, int nCmdShow)
     boxHandles[POS_TOP_LEFT_HANDLE].enable = TRUE;
 
     hwndMain = CreateWindowEx(WS_EX_TRANSPARENT, szSizeBoxClass, NULL,
-        WS_BORDER|WS_CHILD,
-        0, 0, 100, 100, hParent, NULL, appInstance, NULL);
+        WS_CHILD,
+        410, 0, 100, 100, hParent, NULL, appInstance, NULL);
 
     hwndTarget = NULL;
-    bBeginDrag = FALSE;
+    //bBeginDrag = FALSE;
 
     if (!hwndMain) {
         return FALSE;
@@ -81,96 +78,73 @@ LRESULT CALLBACK SizeBoxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
         SetWindowText(hStatic, L"???");
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
-    case WM_LBUTTONDOWN:
+    case WM_NCHITTEST:
     {
-        ptDragBefore.x = ptCurrent.x;
-        ptDragBefore.y = ptCurrent.y;
-        bBeginDrag = TRUE;
-        break;
-    }
-    case WM_LBUTTONUP:
-    {
-        bBeginDrag = FALSE;
-        break;
-    }
-    case WM_MOUSEMOVE:
-    {
-        ptCurrent.x = LOWORD(lParam);
-        ptCurrent.y = HIWORD(lParam);
-        positionType = POS_INSIDE;
-        for (int i = 0; i < 8; i++) {
-            if (PtInRect(&(boxHandles[i].handle), ptCurrent)) {
-                positionType = i;
+        LRESULT hitResult = DefWindowProc(hWnd, WM_NCHITTEST, wParam, lParam);
+        POINT ptCurrent;
+
+        // fool the window to make it think a section is hit when actually hitting somewhere else
+        if (hitResult == HTCLIENT) {
+            positionType = POS_INSIDE;
+            ptCurrent.x = GET_X_LPARAM(lParam);
+            ptCurrent.y = GET_Y_LPARAM(lParam);
+            ScreenToClient(hWnd, &ptCurrent);
+            for (int i = 0; i < 8; i++) {
+                if (PtInRect(&(boxHandles[i].handle), ptCurrent)) {
+                    positionType = (DRAG_HANDLE_POSITION)i;
+                }
+            }
+
+            switch (positionType) {
+                case POS_TOP_LEFT_HANDLE:
+                {
+                    SetWindowText(hStatic, L"TL");
+                    return HTTOPLEFT;
+                }
+                case POS_TOP_CENTER_HANDLE:
+                {
+                    SetWindowText(hStatic, L"TC");
+                    return HTTOP;
+                }
+                case POS_TOP_RIGHT_HANDLE:
+                {
+                    SetWindowText(hStatic, L"TR");
+                    return HTTOPRIGHT;
+                }
+                case POS_MIDDLE_LEFT_HANDLE:
+                {
+                    SetWindowText(hStatic, L"ML");
+                    return HTLEFT;
+                }
+                case POS_MIDDLE_RIGHT_HANDLE:
+                {
+                    SetWindowText(hStatic, L"MR");
+                    return HTRIGHT;
+                }
+                case POS_BOTTOM_LEFT_HANDLE:
+                {
+                    SetWindowText(hStatic, L"BL");
+                    return HTBOTTOMLEFT;
+                }
+                case POS_BOTTOM_CENTER_HANDLE:
+                {
+                    SetWindowText(hStatic, L"BC");
+                    return HTBOTTOM;
+                }
+                case POS_BOTTOM_RIGHT_HANDLE:
+                {
+                    SetWindowText(hStatic, L"BR");
+                    return HTBOTTOMRIGHT;
+                }
+                default:
+                {
+                    SetWindowText(hStatic, L"INSIDE");
+                    return HTCAPTION;
+                }
             }
         }
-
-        if (positionType == POS_INSIDE) {
-            SetWindowText(hStatic, L"INSIDE");
-            if (bBeginDrag) {
-                RECT rect;
-                GetWindowRect(hWnd, &rect);
-                MapWindowPoints(HWND_DESKTOP, GetParent(hWnd), (LPPOINT)&rect, 2);
-                MoveWindow(hWnd, 
-                    rect.left + ptCurrent.x - ptDragBefore.x, 
-                    rect.top + ptCurrent.y - ptDragBefore.y, 
-                    rect.right - rect.left, 
-                    rect.bottom - rect.top, TRUE);
-                //bBeginDrag = FALSE;
-            }
-
-            break;
-        }
-
-        // TODO: update cursor here
-        switch (positionType) {
-            case POS_TOP_LEFT_HANDLE:
-            {
-                SetWindowText(hStatic, L"TL");
-                break;
-            }
-            case POS_TOP_CENTER_HANDLE:
-            {
-                SetWindowText(hStatic, L"TC");
-                break;
-            }
-            case POS_TOP_RIGHT_HANDLE:
-            {
-                SetWindowText(hStatic, L"TR");
-                break;
-            }
-            case POS_MIDDLE_LEFT_HANDLE:
-            {
-                SetWindowText(hStatic, L"ML");
-                break;
-            }
-            case POS_MIDDLE_RIGHT_HANDLE:
-            {
-                SetWindowText(hStatic, L"MR");
-                break;
-            }
-            case POS_BOTTOM_LEFT_HANDLE:
-            {
-                SetWindowText(hStatic, L"BL");
-                break;
-            }
-            case POS_BOTTOM_CENTER_HANDLE:
-            {
-                SetWindowText(hStatic, L"BC");
-                break;
-            }
-            case POS_BOTTOM_RIGHT_HANDLE:
-            {
-                SetWindowText(hStatic, L"BR");
-                break;
-            }
-            default:
-            {
-                SetWindowText(hStatic, L"??");
-                break;
-            }
-        }
-
-        break;
+        
+        return hitResult;
     }
     case WM_COMMAND:
     {

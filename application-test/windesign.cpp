@@ -51,13 +51,16 @@ BOOL InitWindowDesignerInstance(HINSTANCE hInstance, HWND hParent, int nCmdShow)
         0, 0, 300, 250, hwndMain, NULL, appInstance, NULL);
 
     // TODO: make size always same as main window
-    hwndDesign = CreateWindowEx(WS_EX_TOPMOST | WS_EX_TRANSPARENT, szDesignLayerClass, NULL,
+    /*hwndDesign = CreateWindowEx(WS_EX_TOPMOST | WS_EX_TRANSPARENT, szDesignLayerClass, NULL,
+        WS_CHILD,
+        0, 0, 400, 400, hwndMain, NULL, appInstance, NULL);*/
+    hwndDesign = CreateWindowEx(WS_EX_TOPMOST | WS_EX_LAYERED, szDesignLayerClass, NULL,
         WS_CHILD,
         0, 0, 400, 400, hwndMain, NULL, appInstance, NULL);
 
-    if (!InitSizeBoxInstance(appInstance, hwndDesign, nCmdShow)) {
+    /*if (!InitSizeBoxInstance(appInstance, hwndDesign, nCmdShow)) {
         return FALSE;
-    }
+    }*/
 
     if (!hwndMain || !hwndTarget || !hwndDesign) {
         return FALSE;
@@ -67,11 +70,12 @@ BOOL InitWindowDesignerInstance(HINSTANCE hInstance, HWND hParent, int nCmdShow)
     UpdateWindow(hwndMain);
     ShowWindow(hwndTarget, nCmdShow);
     UpdateWindow(hwndTarget);
+    SetLayeredWindowAttributes(hwndDesign, 0, 176, LWA_ALPHA);
     ShowWindow(hwndDesign, nCmdShow);
     UpdateWindow(hwndDesign);
 
     // force redraw once along the hierachy to make sure everything is in correct order
-    InvalidateRect(hwndMain, NULL, TRUE);
+    //InvalidateRect(hwndMain, NULL, TRUE);
 
     return TRUE;
 }

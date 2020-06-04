@@ -1,6 +1,7 @@
 #include "framework.h"
 #include "application-test.h"
 #include "windesign.h"
+#include "sizebox.h"
 
 // Global Variables:
 HINSTANCE hInst;                                // current instance
@@ -110,6 +111,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    if (!InitWindowDesignerInstance(hInst, hWnd, nCmdShow)) {
        return FALSE;
    }
+
+   InitSizeBoxInstance(hInstance, hWnd, nCmdShow);
 
    return TRUE;
 }
