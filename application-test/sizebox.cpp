@@ -31,7 +31,7 @@ BOOL InitSizeBoxInstance(HINSTANCE hInstance, HWND hParent, int nCmdShow)
 
     hwndMain = CreateWindowEx(WS_EX_TRANSPARENT, szSizeBoxClass, NULL,
         WS_CHILD,
-        410, 0, 100, 100, hParent, NULL, appInstance, NULL);
+        0, 0, 100, 100, hParent, NULL, appInstance, NULL);
 
     hwndTarget = NULL;
     //bBeginDrag = FALSE;
@@ -40,6 +40,7 @@ BOOL InitSizeBoxInstance(HINSTANCE hInstance, HWND hParent, int nCmdShow)
         return FALSE;
     }
 
+    //SetLayeredWindowAttributes(hwndMain, RGB(255, 255, 255), 0, LWA_COLORKEY);
     ShowWindow(hwndMain, nCmdShow);
     UpdateWindow(hwndMain);
 
@@ -59,7 +60,7 @@ ATOM RegisterSizeBoxClass(HINSTANCE hInstance)
     wcex.hInstance = hInstance;
     wcex.hIcon = NULL;
     wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground = NULL;
+    wcex.hbrBackground = GetStockBrush(WHITE_BRUSH);
     wcex.lpszMenuName = NULL;
     wcex.lpszClassName = szSizeBoxClass;
     wcex.hIconSm = NULL;

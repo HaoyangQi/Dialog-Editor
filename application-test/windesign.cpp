@@ -1,25 +1,22 @@
 #include "framework.h"
 #include "windesign.h"
-#include "sizebox.h"
+//#include "sizebox.h"
 
 static HINSTANCE appInstance;
 static WCHAR szDesignerWindowClass[MAX_LOADSTRING];
 static WCHAR szTargetLayerClass[MAX_LOADSTRING];
-static WCHAR szDesignLayerClass[MAX_LOADSTRING];
 static WCHAR szTargetTitle[MAX_LOADSTRING];
-static HWND hwndMain, hwndTarget, hwndDesign;
+static HWND hwndMain, hwndTarget;
+//static HDC hdc, hdcMem;
 
 ATOM RegisterDesignWindowClass(HINSTANCE hInstance);
 ATOM RegisterDesignTargetClass(HINSTANCE hInstance);
-ATOM RegisterDesignLayerClass(HINSTANCE hInstance);
 LRESULT CALLBACK DesignWindowWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK DesignTargetWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-LRESULT CALLBACK DesignLayerWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
-// Three window: 
+// Two Layers: 
 // 1. Bottom layer: the base of the control
 // 2. Target layer: the demo child window
-// 3. Design layer: a transparent layer, always on top-most
 BOOL InitWindowDesignerInstance(HINSTANCE hInstance, HWND hParent, int nCmdShow)
 {
     appInstance = hInstance;
@@ -27,7 +24,7 @@ BOOL InitWindowDesignerInstance(HINSTANCE hInstance, HWND hParent, int nCmdShow)
     LoadString(hInstance, IDS_TARGET_LAYER_TITLE, szTargetTitle, MAX_LOADSTRING);
     LoadString(hInstance, IDC_WINDOW_DESIGNER, szDesignerWindowClass, MAX_LOADSTRING);
     LoadString(hInstance, IDC_TARGET_LAYER, szTargetLayerClass, MAX_LOADSTRING);
-    LoadString(hInstance, IDC_DESIGN_LAYER, szDesignLayerClass, MAX_LOADSTRING);
+    //LoadString(hInstance, IDC_DESIGN_LAYER, szDesignLayerClass, MAX_LOADSTRING);
 
     if (!RegisterDesignWindowClass(hInstance)) {
         return FALSE;
@@ -37,32 +34,18 @@ BOOL InitWindowDesignerInstance(HINSTANCE hInstance, HWND hParent, int nCmdShow)
         return FALSE;
     }
 
-    if (!RegisterDesignLayerClass(hInstance)) {
-        return FALSE;
-    }
-
     // this part needs to go WM_CREATE message
-    hwndMain = CreateWindowEx(WS_EX_CLIENTEDGE, szDesignerWindowClass, NULL,
-        WS_BORDER | WS_CHILD,
+    // bottom base pane should not have WS_CLIPCHILDREN so that all drawings are above children
+    hwndMain = CreateWindowEx(WS_EX_TRANSPARENT, szDesignerWindowClass, NULL,
+        WS_VISIBLE | WS_CHILDWINDOW | WS_CLIPSIBLINGS,
         0, 0, 400, 400, hParent, NULL, appInstance, NULL);
 
-    hwndTarget = CreateWindow(szTargetLayerClass, szTargetTitle,
-        WS_CAPTION | WS_BORDER | WS_CHILD | WS_DISABLED,
+    // target window should be a standard window but only disabled
+    hwndTarget = CreateWindowEx(0, szTargetLayerClass, szTargetTitle,
+        WS_CAPTION | WS_CHILDWINDOW | WS_VISIBLE | 0/*WS_DISABLED*/ | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_SYSMENU,
         0, 0, 300, 250, hwndMain, NULL, appInstance, NULL);
 
-    // TODO: make size always same as main window
-    /*hwndDesign = CreateWindowEx(WS_EX_TOPMOST | WS_EX_TRANSPARENT, szDesignLayerClass, NULL,
-        WS_CHILD,
-        0, 0, 400, 400, hwndMain, NULL, appInstance, NULL);*/
-    hwndDesign = CreateWindowEx(WS_EX_TOPMOST | WS_EX_LAYERED, szDesignLayerClass, NULL,
-        WS_CHILD,
-        0, 0, 400, 400, hwndMain, NULL, appInstance, NULL);
-
-    /*if (!InitSizeBoxInstance(appInstance, hwndDesign, nCmdShow)) {
-        return FALSE;
-    }*/
-
-    if (!hwndMain || !hwndTarget || !hwndDesign) {
+    if (!hwndMain || !hwndTarget) {
         return FALSE;
     }
 
@@ -70,12 +53,6 @@ BOOL InitWindowDesignerInstance(HINSTANCE hInstance, HWND hParent, int nCmdShow)
     UpdateWindow(hwndMain);
     ShowWindow(hwndTarget, nCmdShow);
     UpdateWindow(hwndTarget);
-    SetLayeredWindowAttributes(hwndDesign, 0, 176, LWA_ALPHA);
-    ShowWindow(hwndDesign, nCmdShow);
-    UpdateWindow(hwndDesign);
-
-    // force redraw once along the hierachy to make sure everything is in correct order
-    //InvalidateRect(hwndMain, NULL, TRUE);
 
     return TRUE;
 }
@@ -86,7 +63,7 @@ ATOM RegisterDesignWindowClass(HINSTANCE hInstance)
 
     wcex.cbSize = sizeof(WNDCLASSEX);
 
-    wcex.style = CS_HREDRAW | CS_VREDRAW;
+    wcex.style = CS_DBLCLKS;
     wcex.lpfnWndProc = DesignWindowWndProc;
     wcex.cbClsExtra = 0;
     wcex.cbWndExtra = 0;
@@ -107,7 +84,7 @@ ATOM RegisterDesignTargetClass(HINSTANCE hInstance)
 
     wcex.cbSize = sizeof(WNDCLASSEX);
 
-    wcex.style = CS_HREDRAW | CS_VREDRAW;
+    wcex.style = CS_DBLCLKS;
     wcex.lpfnWndProc = DesignTargetWndProc;
     wcex.cbClsExtra = 0;
     wcex.cbWndExtra = 0;
@@ -117,27 +94,6 @@ ATOM RegisterDesignTargetClass(HINSTANCE hInstance)
     wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wcex.lpszMenuName = NULL;
     wcex.lpszClassName = szTargetLayerClass;
-    wcex.hIconSm = NULL;
-
-    return RegisterClassEx(&wcex);
-}
-
-ATOM RegisterDesignLayerClass(HINSTANCE hInstance)
-{
-    WNDCLASSEX wcex;
-
-    wcex.cbSize = sizeof(WNDCLASSEX);
-
-    wcex.style = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc = DesignLayerWndProc;
-    wcex.cbClsExtra = 0;
-    wcex.cbWndExtra = 0;
-    wcex.hInstance = hInstance;
-    wcex.hIcon = NULL;
-    wcex.hCursor = LoadCursor(hInstance, MAKEINTRESOURCE(IDC_CUR_MAIN));
-    wcex.hbrBackground = NULL; // empty background
-    wcex.lpszMenuName = NULL;
-    wcex.lpszClassName = szDesignLayerClass;
     wcex.hIconSm = NULL;
 
     return RegisterClassEx(&wcex);
@@ -160,20 +116,50 @@ LRESULT CALLBACK DesignWindowWndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
     break;
     case WM_PAINT:
     {
+        OutputDebugString(L"Main Draw call\n");
+        // Use BeginPaint to fetch DC will set clip region no matter what
+        // But using GetDC is dangerous as it cannot validate region and pop WM_PAINT request (high cpu)
+        // So simple trade-off: use BeginPaint/EndPaint as a guard, additionally GetDC, then draw
+        // further optimization: double-buffering
         PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hWnd, &ps);
+        HDC hdc;
+        hdc = BeginPaint(hWnd, &ps);
+        //hdc = GetWindowDC(hWnd); // DC of entire window
+        //hdc = GetDC(hWnd);
+
+        /* Double befuerring template code
+        
+        // Create an off-screen DC for double-buffering
+        hdcMem = CreateCompatibleDC(hdc);
+        hbmMem = CreateCompatibleBitmap(hdc, win_width, win_height);
+
+        hOld = SelectObject(hdcMem, hbmMem);
+
+        // Draw into hdcMem here
+
+        // Transfer the off-screen DC to the screen
+        BitBlt(hdc, 0, 0, win_width, win_height, hdcMem, 0, 0, SRCCOPY);
+
+        // Free-up the off-screen DC
+        SelectObject(hdcMem, hOld);
+
+        DeleteObject(hbmMem);
+        DeleteDC (hdcMem);
+
+        */
 
         RECT rect;
         SelectObject(hdc, GetStockObject(DC_PEN));
         SetDCPenColor(hdc, RGB(255, 0, 0));
         GetClientRect(hWnd, &rect);
-        MoveToEx(hdc, rect.right, rect.top, NULL);
-        LineTo(hdc, 0, rect.bottom - rect.top);
+        MoveToEx(hdc, 0, 0, NULL);
+        LineTo(hdc, rect.right, rect.bottom);
 
+        //WindowDesignerRefreshEx(hdc);
+
+        ReleaseDC(hWnd, hdc);
         EndPaint(hWnd, &ps);
-
-        // update topmost layer to avoid any overlapping
-        // InvalidateRect(hwndDesign, NULL, TRUE);
+        //WindowDesignerRefresh();
     }
     break;
     case WM_DESTROY:
@@ -182,6 +168,12 @@ LRESULT CALLBACK DesignWindowWndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
+
+    /*if (message == WM_PAINT) {
+        OutputDebugString(L"Override\n");
+        WindowDesignerRefresh();
+    }*/
+
     return 0;
 }
 
@@ -189,12 +181,6 @@ LRESULT CALLBACK DesignTargetWndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
 {
     switch (message)
     {
-    case WM_CREATE:
-    {
-        CreateWindow(L"BUTTON", L"Test", WS_VISIBLE | WS_CHILD,
-            100, 100, 100, 20, hWnd, NULL, appInstance, nullptr);
-        return DefWindowProc(hWnd, message, wParam, lParam);
-    }
     case WM_COMMAND:
     {
         int wmId = LOWORD(wParam);
@@ -206,43 +192,15 @@ LRESULT CALLBACK DesignTargetWndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
         }
     }
     break;
-    /*case WM_WINDOWPOSCHANGING:
-    {
-        LPWINDOWPOS pos = (LPWINDOWPOS)lParam;
-        RECT rect;
-
-        GetDesignWindowClientPos(hWnd, &rect);
-
-        // Prevent child window from being moved by user
-        if (!isValidUpdate) {
-            pos->x = rect.left;
-            pos->y = rect.top;
-            pos->cx = rect.right - rect.left;
-            pos->cy = rect.bottom - rect.top;
-        }
-        else {
-            isValidUpdate = FALSE;
-        }
-    }
-    break;*/
     case WM_PAINT:
     {
         PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hWnd, &ps);
-
-        RECT rect;
-        SelectObject(hdc, GetStockObject(DC_PEN));
-        SetDCPenColor(hdc, RGB(0, 255, 0));
-        GetClientRect(hWnd, &rect);
-        MoveToEx(hdc, rect.right, rect.top, NULL);
-        LineTo(hdc, 0, rect.bottom - rect.top);
-
+        BeginPaint(hWnd, &ps);
+        OutputDebugString(L"Target Draw call\n");
         EndPaint(hWnd, &ps);
-
-        // update topmost layer to avoid any overlapping
-        // InvalidateRect(hwndDesign, NULL, TRUE);
+        //WindowDesignerRefresh();
+        break;
     }
-    break;
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
@@ -252,43 +210,121 @@ LRESULT CALLBACK DesignTargetWndProc(HWND hWnd, UINT message, WPARAM wParam, LPA
     return 0;
 }
 
-LRESULT CALLBACK DesignLayerWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+void WindowDesignerRefresh()
 {
-    switch (message)
-    {
-    case WM_COMMAND:
-    {
-        int wmId = LOWORD(wParam);
-        // Parse the menu selections:
-        switch (wmId)
-        {
-        default:
-            return DefWindowProc(hWnd, message, wParam, lParam);
-        }
-    }
-    break;
-    case WM_PAINT:
-    {
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hWnd, &ps);
+    HDC hdc, hdcMem;
+    HBITMAP bitmapMem;
+    //HGDIOBJ objOld;
+    RECT rect;
+    LONG clientWidth, clientHeight;
 
-        RECT rect;
-        SelectObject(hdc, GetStockObject(DC_PEN));
-        SetDCPenColor(hdc, RGB(0, 0, 255));
-        GetClientRect(hWnd, &rect);
-        MoveToEx(hdc, 0, 0, NULL);
-        LineTo(hdc, rect.right - rect.left, rect.bottom - rect.top);
+    RedrawWindow(hwndMain, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
+    GetClientRect(hwndMain, &rect);
 
-        EndPaint(hWnd, &ps);
-    }
-    break;
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        break;
-    default:
-        return DefWindowProc(hWnd, message, wParam, lParam);
-    }
-    return 0;
+    OutputDebugString(L"Override\n");
+
+    clientWidth = rect.right - rect.left;
+    clientHeight = rect.bottom - rect.top;
+    hdc = GetDC(hwndMain);
+    hdcMem = CreateCompatibleDC(hdc);
+    bitmapMem = CreateCompatibleBitmap(hdc, clientWidth, clientHeight);
+    //objOld = SelectObject(hdcMem, bitmapMemMask);
+
+    SelectObject(hdcMem, GetStockObject(DC_PEN));
+
+    SetDCPenColor(hdcMem, RGB(0, 0, 255));
+    MoveToEx(hdcMem, 0, 0, NULL);
+    LineTo(hdcMem, rect.right, rect.bottom);
+
+    TransparentBlt(hdc, 0, 0, clientWidth, clientHeight, hdcMem, 0, 0, clientWidth, clientHeight, RGB(0, 0, 0));
+
+    //SelectObject(hdcMem, objOld);
+    DeleteObject(bitmapMem);
+    DeleteDC(hdcMem);
+    ReleaseDC(hwndMain, hdc);
+}
+
+void WindowDesignerRefresh2()
+{
+    HDC hdc, hdcMem, hdcMask;
+    HBITMAP bitmapMem, bitmapMemMask;
+    //HGDIOBJ objOld;
+    RECT rect;
+    LONG clientWidth, clientHeight;
+
+    RedrawWindow(hwndMain, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
+    GetClientRect(hwndMain, &rect);
+
+    OutputDebugString(L"Override\n");
+
+    clientWidth = rect.right - rect.left;
+    clientHeight = rect.bottom - rect.top;
+    hdc = GetDC(hwndMain);
+    hdcMem = CreateCompatibleDC(hdc);
+    hdcMask = CreateCompatibleDC(hdc);
+    bitmapMem = CreateCompatibleBitmap(hdc, clientWidth, clientHeight);
+    bitmapMemMask = CreateCompatibleBitmap(hdc, clientWidth, clientHeight);
+    //objOld = SelectObject(hdcMem, bitmapMemMask);
+
+    SelectObject(hdcMask, bitmapMem);
+    SelectObject(hdcMask, GetStockObject(DC_PEN));
+    SetDCPenColor(hdcMask, RGB(0, 0, 0));
+    SelectObject(hdcMem, bitmapMemMask);
+    SelectObject(hdcMem, GetStockObject(DC_PEN));
+    FillRect(hdcMask, &rect, GetStockBrush(WHITE_BRUSH));
+
+    MoveToEx(hdcMask, 0, 0, NULL);
+    LineTo(hdcMask, rect.right, rect.bottom);
+
+    SetDCPenColor(hdcMem, RGB(0, 0, 255));
+    MoveToEx(hdcMem, 0, 0, NULL);
+    LineTo(hdcMem, rect.right, rect.bottom);
+
+    BitBlt(hdc, 0, 0, clientWidth, clientHeight, hdcMask, 0, 0, SRCAND);
+    BitBlt(hdc, 0, 0, clientWidth, clientHeight, hdcMem, 0, 0, SRCPAINT);
+
+    //SelectObject(hdcMem, objOld);
+    DeleteObject(bitmapMem);
+    DeleteObject(bitmapMemMask);
+    DeleteDC(hdcMem);
+    DeleteDC(hdcMask);
+    ReleaseDC(hwndMain, hdc);
+}
+
+void WindowDesignerRefreshEx(HDC hdcMain)
+{
+    OutputDebugString(L"Override\n");
+    HDC hdcMemMain, hdcTarget;
+    HBITMAP bitmapMem;
+    HGDIOBJ objOld;
+    RECT rect, rectTargetWindow;
+    LONG clientWidth, clientHeight;
+
+    InvalidateRect(hwndTarget, NULL, TRUE);
+
+    GetClientRect(hwndMain, &rect);
+    GetWindowRect(hwndTarget, &rectTargetWindow);
+    MapWindowPoints(HWND_DESKTOP, hwndMain, (LPPOINT)&rectTargetWindow, 2);
+
+    clientWidth = rect.right - rect.left;
+    clientHeight = rect.bottom - rect.top;
+    hdcTarget = GetWindowDC(hwndTarget);
+    hdcMemMain = CreateCompatibleDC(hdcMain);
+    bitmapMem = CreateCompatibleBitmap(hdcMain, clientWidth, clientHeight);
+    objOld = SelectObject(hdcMemMain, bitmapMem);
+
+    SelectObject(hdcMemMain, GetStockObject(DC_PEN));
+    SetDCPenColor(hdcMemMain, RGB(0, 255, 255));
+    MoveToEx(hdcMemMain, rect.right, rect.top, NULL);
+    LineTo(hdcMemMain, rect.left, rect.bottom);
+
+    BitBlt(hdcMain, 0, 0, clientWidth, clientHeight, hdcMemMain, 0, 0, SRCPAINT);
+    BitBlt(hdcTarget, 0, 0, rectTargetWindow.right-rectTargetWindow.left, rectTargetWindow.bottom-rectTargetWindow.top, hdcMemMain, rectTargetWindow.left, rectTargetWindow.top, SRCCOPY);
+
+    SelectObject(hdcMemMain, objOld);
+    DeleteObject(bitmapMem);
+    DeleteDC(hdcMemMain);
+    ReleaseDC(hwndTarget, hdcTarget);
 }
 
 // DEBUG ONLY
@@ -303,7 +339,8 @@ void MoveTargetWindow(int delta_horizontal, int delta_vertical)
     rect.right += delta_horizontal;
     rect.bottom += delta_vertical;
     MoveWindow(hwndTarget, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, TRUE);
-    InvalidateRect(hwndMain, NULL, TRUE);
+    //InvalidateRect(hwndMain, NULL, TRUE);
+    //WindowDesignerRefresh();
 }
 
 void ScaleTargetWindow(int delta_width, int delta_height)
@@ -315,5 +352,6 @@ void ScaleTargetWindow(int delta_width, int delta_height)
     rect.right += delta_width;
     rect.bottom += delta_height;
     MoveWindow(hwndTarget, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, TRUE);
-    InvalidateRect(hwndMain, NULL, TRUE);
+    //OutputDebugString(L"Invalidate main area\n");
+    //InvalidateRect(hwndMain, NULL, TRUE);
 }

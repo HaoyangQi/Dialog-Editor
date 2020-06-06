@@ -55,13 +55,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     return (int) msg.wParam;
 }
 
-
-
-//
-//  FUNCTION: MyRegisterClass()
-//
-//  PURPOSE: Registers the window class.
-//
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
     WNDCLASSEXW wcex;
@@ -83,16 +76,6 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     return RegisterClassExW(&wcex);
 }
 
-//
-//   FUNCTION: InitInstance(HINSTANCE, int)
-//
-//   PURPOSE: Saves instance handle and creates main window
-//
-//   COMMENTS:
-//
-//        In this function, we save the instance handle in a global variable and
-//        create and display the main program window.
-//
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    hInst = hInstance; // Store instance handle in our global variable
@@ -112,21 +95,11 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
        return FALSE;
    }
 
-   InitSizeBoxInstance(hInstance, hWnd, nCmdShow);
+   //InitSizeBoxInstance(hInstance, hWnd, nCmdShow);
 
    return TRUE;
 }
 
-//
-//  FUNCTION: WndProc(HWND, UINT, WPARAM, LPARAM)
-//
-//  PURPOSE: Processes messages for the main window.
-//
-//  WM_COMMAND  - process the application menu
-//  WM_PAINT    - Paint the main window
-//  WM_DESTROY  - post a quit message and return
-//
-//
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {    
     switch (message)
@@ -149,7 +122,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             700, 120, 100, 20, hWnd, (HMENU)IDC_BTN_INC_HEIGHT, hInst, nullptr);
         CreateWindowW(L"BUTTON", L"- Height", WS_VISIBLE | WS_CHILD,
             700, 140, 100, 20, hWnd, (HMENU)IDC_BTN_DEC_HEIGHT, hInst, nullptr);
-        CreateWindowW(L"BUTTON", L"Ivalidate", WS_VISIBLE | WS_CHILD | WS_DISABLED,
+        CreateWindowW(L"BUTTON", L"Invalidate", WS_VISIBLE | WS_CHILD,
             700, 160, 100, 20, hWnd, (HMENU)IDC_BTN_IVALIDATE, hInst, nullptr);
     }
     break;
@@ -167,31 +140,31 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             DestroyWindow(hWnd);
             break;
         case IDC_BTN_MOVE_LEFT:
-            MoveTargetWindow(-1, 0);
+            MoveTargetWindow(-10, 0);
             break;
         case IDC_BTN_MOVE_RIGHT:
-            MoveTargetWindow(1, 0);
+            MoveTargetWindow(10, 0);
             break;
         case IDC_BTN_MOVE_UP:
-            MoveTargetWindow(0, -1);
+            MoveTargetWindow(0, -10);
             break;
         case IDC_BTN_MOVE_DOWN:
-            MoveTargetWindow(0, 1);
+            MoveTargetWindow(0, 10);
             break;
         case IDC_BTN_INC_WIDTH:
-            ScaleTargetWindow(1, 0);
+            ScaleTargetWindow(10, 0);
             break;
         case IDC_BTN_DEC_WIDTH:
-            ScaleTargetWindow(-1, 0);
+            ScaleTargetWindow(-10, 0);
             break;
         case IDC_BTN_INC_HEIGHT:
-            ScaleTargetWindow(0, 1);
+            ScaleTargetWindow(0, 10);
             break;
         case IDC_BTN_DEC_HEIGHT:
-            ScaleTargetWindow(0, -1);
+            ScaleTargetWindow(0, -10);
             break;
         case IDC_BTN_IVALIDATE:
-            InvalidateRect(hWnd, NULL, FALSE);
+            WindowDesignerRefresh();
             break;
         default:
             return DefWindowProc(hWnd, message, wParam, lParam);
