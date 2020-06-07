@@ -34,21 +34,24 @@ void debugCheckError(int pos) {
     }
 }
 
-void InitWindowDesigner(WINDOW_DESIGNER* pwd, HWND base, HWND target)
+void InitWindowDesigner(WINDOW_DESIGNER* pwd)
 {
     BITMAP image;
+    HDC hdc;
 
-    pwd->hwndMain = base;
-    pwd->hwndTarget = target;
+    pwd->hwndMain = NULL;
+    pwd->hwndTarget = NULL;
 
     pwd->hdcHandleDisable = CreateCompatibleDC(NULL);
     pwd->hdcHandleEnable = CreateCompatibleDC(NULL);
     pwd->hdcMask = CreateCompatibleDC(NULL);
     pwd->hdcTrack = CreateCompatibleDC(NULL);
+    pwd->hdcSnapshot = CreateCompatibleDC(NULL);
 
     pwd->bmpHandleEnable = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_HANDLE_ENABLE));
     pwd->bmpHandleDisable = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_HANDLE_DISABLE));
     pwd->penTrackPen = CreatePen(PS_DASH, 0, RGB(0, 0, 0));
+    pwd->brTrackBrush = GetStockBrush(NULL_BRUSH);
 
     // Fetch image dimension
     GetObject(pwd->bmpHandleEnable, sizeof(BITMAP), &image);
@@ -61,43 +64,72 @@ void InitWindowDesigner(WINDOW_DESIGNER* pwd, HWND base, HWND target)
     pwd->oldHandleDisable = SelectObject(pwd->hdcHandleDisable, pwd->bmpHandleDisable);
     pwd->oldHandleEnable = SelectObject(pwd->hdcHandleEnable, pwd->bmpHandleEnable);
     pwd->oldMask = SelectObject(pwd->hdcMask, pwd->bmpMask);
-    pwd->oldSnapshot = GetCurrentObject(pwd->hdcTrack, OBJ_BITMAP);
     pwd->oldTrackPen = SelectObject(pwd->hdcTrack, pwd->penTrackPen);
+    pwd->oldTrackBrush = SelectObject(pwd->hdcTrack, pwd->brTrackBrush);
+    pwd->oldTrackBuffer = GetCurrentObject(pwd->hdcTrack, OBJ_BITMAP);
+    pwd->oldSnapshot = GetCurrentObject(pwd->hdcSnapshot, OBJ_BITMAP);
+
+    // track buffer and snapshot buffer will be set in WM_CREATE
+    // because this process should be completed before any message being processed
+    // hence before all CreateWindow call
+    pwd->bmpTrackBuffer = NULL;
+    pwd->bmpSnapshot = NULL;
 }
 
 void ReleaseWindowDesigner(WINDOW_DESIGNER* pwd)
 {
+    // detach objects
     SelectObject(pwd->hdcHandleDisable, pwd->oldHandleDisable);
     SelectObject(pwd->hdcHandleEnable, pwd->oldHandleEnable);
     SelectObject(pwd->hdcMask, pwd->oldMask);
-    SelectObject(pwd->hdcTrack, pwd->oldSnapshot);
+    SelectObject(pwd->hdcTrack, pwd->oldTrackBuffer);
     SelectObject(pwd->hdcTrack, pwd->oldTrackPen);
+    SelectObject(pwd->hdcTrack, pwd->oldTrackBrush);
+    SelectObject(pwd->hdcSnapshot, pwd->oldSnapshot);
 
+    // release objects
     DeleteObject(pwd->bmpHandleDisable);
     DeleteObject(pwd->bmpHandleEnable);
     DeleteObject(pwd->bmpMask);
     DeleteObject(pwd->bmpSnapshot);
-    DeleteObject(pwd->oldTrackPen);
+    DeleteObject(pwd->penTrackPen);
+    DeleteObject(pwd->brTrackBrush);
+    DeleteObject(pwd->bmpTrackBuffer);
 
+    // release DCs
     DeleteDC(pwd->hdcHandleDisable);
     DeleteDC(pwd->hdcHandleEnable);
     DeleteDC(pwd->hdcMask);
     DeleteDC(pwd->hdcTrack);
+    DeleteDC(pwd->hdcSnapshot);
 }
 
-void UpdateBufferSize(WINDOW_DESIGNER* pwd)
+void UpdateTrackBufferSize(WINDOW_DESIGNER* pwd, HWND hwnd)
 {
     RECT rect;
     HDC hdc;
 
-    GetClientRect(pwd->hwndMain, &rect);
-    SelectObject(pwd->hdcTrack, pwd->oldSnapshot);
-    DeleteObject(pwd->bmpSnapshot);
+    GetClientRect(hwnd, &rect);
+    SelectObject(pwd->hdcTrack, pwd->oldTrackBuffer);
+    SelectObject(pwd->hdcSnapshot, pwd->oldSnapshot);
 
-    hdc = GetDC(pwd->hwndMain);
+    if (pwd->bmpTrackBuffer) {
+        DeleteObject(pwd->bmpTrackBuffer);
+    }
+    if (pwd->bmpSnapshot) {
+        DeleteObject(pwd->bmpSnapshot);
+    }
+
+    hdc = GetDC(hwnd);
+    pwd->szBuffer.cx = rect.right;
+    pwd->szBuffer.cy = rect.bottom;
+    pwd->bmpTrackBuffer = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
     pwd->bmpSnapshot = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
-    SelectObject(pwd->hdcTrack, pwd->bmpSnapshot);
-    ReleaseDC(pwd->hwndMain, hdc);
+    pwd->oldTrackBuffer = SelectObject(pwd->hdcTrack, pwd->bmpTrackBuffer);
+    pwd->oldSnapshot = SelectObject(pwd->hdcSnapshot, pwd->bmpSnapshot);
+    BitBlt(pwd->hdcTrack, 0, 0, rect.right, rect.bottom, hdc, 0, 0, SRCCOPY);
+    BitBlt(pwd->hdcSnapshot, 0, 0, rect.right, rect.bottom, hdc, 0, 0, SRCCOPY);
+    ReleaseDC(hwnd, hdc);
 }
 
 BOOL DrawHandle(WINDOW_DESIGNER* pwd, HDC hdc, int x, int y, BOOL bEnable)
@@ -297,7 +329,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    hInst = hInstance; // Store instance handle in our global variable
 
-   InitWindowDesigner(&designerData, NULL, NULL);
+   InitWindowDesigner(&designerData);
 
    designerData.hwndMain = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW/*WS_CHILDWINDOW | WS_VISIBLE | WS_CLIPSIBLINGS*/,
       50, 50, 700, 400, nullptr, nullptr, hInstance, nullptr);
@@ -334,6 +366,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         {
             CreateWindow(L"BUTTON", L"Move Left", WS_VISIBLE | WS_CHILD,
                 310, 10, 100, 20, hWnd, (HMENU)1000, hInst, nullptr);
+
+            // create track buffer
+            UpdateTrackBufferSize(&designerData, hWnd);
+
             break;
         }
         case WM_COMMAND:
@@ -357,8 +393,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
         case WM_LBUTTONDOWN:
         {
+            LONG x = GET_X_LPARAM(lParam);
+            LONG y = GET_Y_LPARAM(lParam);
             //OutputDebugString(L"Parent Mouse Down\n");
             bVisible = FALSE;
+            designerData.ptTrackStart.x = x;
+            designerData.ptTrackStart.y = y;
+            SetRect(&(designerData.rcTrackPrev), x, y, x, y);
+
+            HDC hdc = GetDC(hWnd);
+            BitBlt(designerData.hdcTrack, 0, 0, designerData.szBuffer.cx, designerData.szBuffer.cy, hdc, 0, 0, SRCCOPY);
+            BitBlt(designerData.hdcSnapshot, 0, 0, designerData.szBuffer.cx, designerData.szBuffer.cy, hdc, 0, 0, SRCCOPY);
+            ReleaseDC(hWnd, hdc);
+            // TODO: SetCapture
+            // TODO: shold force update before bitblt
             InvalidateRect(hWnd, NULL, TRUE);
             break;
         }
@@ -380,9 +428,36 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             // => black part no effect, white part will invert the color
             // => when another move come, use original mem XOR with DC again, then update mem
             if (wParam & MK_LBUTTON) {
-                ;
+                LONG x = GET_X_LPARAM(lParam);
+                LONG y = GET_Y_LPARAM(lParam);
+                LONG trackW = abs(designerData.ptTrackStart.x - x);
+                LONG trackH = abs(designerData.ptTrackStart.y - y);
+
+                x = min(designerData.ptTrackStart.x, x);
+                y = min(designerData.ptTrackStart.y, y);
+
+                HDC hdc = GetDC(hWnd);
+                BitBlt(designerData.hdcTrack, 0, 0, designerData.szBuffer.cx, designerData.szBuffer.cy, 
+                    designerData.hdcSnapshot, 0, 0, SRCCOPY);
+                BitBlt(hdc, 
+                    designerData.rcTrackPrev.left, 
+                    designerData.rcTrackPrev.top,
+                    designerData.rcTrackPrev.right - designerData.rcTrackPrev.left, 
+                    designerData.rcTrackPrev.bottom - designerData.rcTrackPrev.top,
+                    designerData.hdcSnapshot, 
+                    designerData.rcTrackPrev.left,
+                    designerData.rcTrackPrev.top, SRCCOPY);
+                Rectangle(designerData.hdcTrack, x, y, x + trackW, y + trackH);
+                /*RECT tcrc;
+                SetRect(&tcrc, x, y, x + trackW, y + trackH);
+                FrameRect(designerData.hdcTrack, &tcrc, GetStockBrush(BLACK_BRUSH));*/
+                BitBlt(hdc, x, y, trackW, trackH, designerData.hdcTrack, x, y, SRCCOPY);
+                ReleaseDC(hWnd, hdc);
+
+                SetRect(&(designerData.rcTrackPrev), x, y, x + trackW, y + trackH);
+
+                break;
             }
-            break;
         }
         case WM_SIZING:
         {
@@ -393,6 +468,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case WM_SIZE:
         {
             bVisible = TRUE;
+            if (wParam == SIZE_RESTORED) {
+                UpdateTrackBufferSize(&designerData, hWnd);
+            }
             break;
         }
         case WM_PAINT:

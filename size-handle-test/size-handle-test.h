@@ -1,6 +1,7 @@
 #pragma once
 
 #include "resource.h"
+#include <windowsx.h>
 
 #define HANDLE_TOP_LEFT      0x01
 #define HANDLE_TOP_CENTER    0x02
@@ -38,12 +39,19 @@ typedef struct {
 	LONG imgWidth;
 	LONG imgHeight;
 
-	// Track rectangle
+	// Track rectangle: 
 	HBITMAP bmpSnapshot;
+	HBITMAP bmpTrackBuffer;
 	HPEN penTrackPen;
+	HBRUSH brTrackBrush;
 	HGDIOBJ oldSnapshot;
+	HGDIOBJ oldTrackBuffer;
 	HGDIOBJ oldTrackPen;
+	HGDIOBJ oldTrackBrush;
+	HDC hdcSnapshot;
 	HDC hdcTrack;
-	POINT ptTrack;
-	SIZE szTrack;
+	POINT ptTrackStart;
+	SIZE szBuffer;
+	RECT rcTrackPrev;
+	//SIZE szTrackPrev;
 } WINDOW_DESIGNER;
