@@ -12,7 +12,7 @@ WINDOW_LIST* NewWindowList(HWND hwndBase, BOOL isVisible)
 	pList->bVisible = isVisible;
 
 	if (hwndBase) {
-		pList->base = AddWindow(pList, hwndBase, LOCK_TOP_LEFT);
+		pList->base = AddWindow(pList, hwndBase, LOCK_TOPLEFT);
 		if (!pList->base) {
 			ReleaseWindowList(pList);
 			return NULL;

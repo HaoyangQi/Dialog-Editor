@@ -12,8 +12,10 @@ WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 WCHAR szTargetLayerClass[MAX_LOADSTRING] = L"TargetWindowTest";
 WCHAR szTargetTitle[MAX_LOADSTRING] = L"Target Test Window";
+
 HWND hTarget = NULL;
 BOOL isPressedLB = FALSE;
+
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -30,6 +32,7 @@ BOOL DrawHandle(HDC hdc, int x, int y, BOOL bEnable)
     HGDIOBJ bmpHandleOld, bmpMaskOld; //, bmpMemOld
     BITMAP image;
     LONG width, height;
+    BOOL ret = TRUE;
     
     //hdcMem = CreateCompatibleDC(NULL);
     hdcMask = CreateCompatibleDC(NULL);
@@ -38,6 +41,7 @@ BOOL DrawHandle(HDC hdc, int x, int y, BOOL bEnable)
     bmpHandleEnable = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_HANDLE_ENABLE));
     bmpHandleDisable = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_HANDLE_DISABLE));
 
+    // fetch image dimension
     GetObject(bmpHandleEnable, sizeof(BITMAP), &image);
     width = image.bmWidth;
     height = image.bmHeight;
@@ -63,9 +67,9 @@ BOOL DrawHandle(HDC hdc, int x, int y, BOOL bEnable)
 */
 
     // Method 2, 3 access to DC
-    BitBlt(hdc, x, y, width, height, hdcHandle, 0, 0, SRCINVERT);
-    BitBlt(hdc, x, y, width, height, hdcMask, 0, 0, SRCAND);
-    BitBlt(hdc, x, y, width, height, hdcHandle, 0, 0, SRCINVERT);
+    ret &= BitBlt(hdc, x, y, width, height, hdcHandle, 0, 0, SRCINVERT);
+    ret &= BitBlt(hdc, x, y, width, height, hdcMask, 0, 0, SRCAND);
+    ret &= BitBlt(hdc, x, y, width, height, hdcHandle, 0, 0, SRCINVERT);
 
     //SelectObject(hdcMem, bmpMemOld);
     SelectObject(hdcHandle, bmpHandleOld);
@@ -77,7 +81,46 @@ BOOL DrawHandle(HDC hdc, int x, int y, BOOL bEnable)
     DeleteDC(hdcHandle);
     DeleteDC(hdcMask);
 
-    return TRUE;
+    return ret;
+}
+
+BOOL DrawWindowHandles(HWND parent, HWND target, int dd, LONG flagEnableHandles)
+{
+    BOOL ret = TRUE;
+    RECT rcTarget;
+    LONG width, height, step_x, step_y;
+    HDC hdc;
+
+    if (!IsChild(parent, target)) {
+        return FALSE;
+    }
+
+    GetWindowRect(target, &rcTarget);
+    MapWindowPoints(HWND_DESKTOP, parent, (LPPOINT)&rcTarget, 2);
+    InflateRect(&rcTarget, dd, dd);
+
+    width = rcTarget.right - rcTarget.left;
+    height = rcTarget.bottom - rcTarget.top;
+    step_x = (width - dd) / 2;
+    step_y = (height - dd) / 2;
+
+    hdc = GetDC(parent);
+
+    for (int y = rcTarget.top, index = 0; y <= height; y += step_y) {
+        for (int x = rcTarget.left; x <= width; x += step_x) {
+            // skip center
+            if (x == rcTarget.left + step_x && y == rcTarget.top + step_y) {
+                continue;
+            }
+
+            ret &= DrawHandle(hdc, x, y, flagEnableHandles & 1);
+            flagEnableHandles >>= 1;
+        }
+    }
+    
+    ReleaseDC(parent, hdc);
+
+    return ret;
 }
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
@@ -183,10 +226,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    ShowWindow(hTarget, nCmdShow);
    UpdateWindow(hTarget);
 
-   HDC hdc = GetDC(hWnd);
-   DrawHandle(hdc, 0, 0, TRUE);
-   ReleaseDC(hWnd, hdc);
-
    return TRUE;
 }
 
@@ -262,22 +301,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             // post paint
             if (!isPressedLB) {
-                InflateRect(&rcTarget, 6, 6);
-                width = rcTarget.right - rcTarget.left;
-                height = rcTarget.bottom - rcTarget.top;
-                hdc = GetDC(hWnd);
-                // top lane
-                DrawHandle(hdc, rcTarget.left, rcTarget.top, FALSE);
-                DrawHandle(hdc, rcTarget.left + width / 2 - 3, rcTarget.top, FALSE);
-                DrawHandle(hdc, rcTarget.right - 6, rcTarget.top, FALSE);
-                // middle lane
-                DrawHandle(hdc, rcTarget.left, rcTarget.top + height / 2 - 3, FALSE);
-                DrawHandle(hdc, rcTarget.right - 6, rcTarget.top + height / 2 - 3, TRUE);
-                // bottom lane
-                DrawHandle(hdc, rcTarget.left, rcTarget.bottom - 6, FALSE);
-                DrawHandle(hdc, rcTarget.left + width / 2 - 3, rcTarget.bottom - 6, TRUE);
-                DrawHandle(hdc, rcTarget.right - 6, rcTarget.bottom - 6, TRUE);
-                ReleaseDC(hWnd, hdc);
+                DrawWindowHandles(hWnd, hTarget, 6, ENABLE_RIGHTBOTTOM);
             }
 
             break;

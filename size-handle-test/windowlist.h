@@ -2,20 +2,24 @@
 
 #include "framework.h"
 
-#define POS_TOP_LEFT_HANDLE      0x01
-#define POS_TOP_CENTER_HANDLE    0x02
-#define POS_TOP_RIGHT_HANDLE     0x04
-#define POS_MIDDLE_LEFT_HANDLE   0x08
-#define POS_MIDDLE_RIGHT_HANDLE  0x10
-#define POS_BOTTOM_LEFT_HANDLE   0x20
-#define POS_BOTTOM_CENTER_HANDLE 0x40
-#define POS_BOTTOM_RIGHT_HANDLE  0x80
+#define HANDLE_TOP_LEFT      0x01
+#define HANDLE_TOP_CENTER    0x02
+#define HANDLE_TOP_RIGHT     0x04
+#define HANDLE_MIDDLE_LEFT   0x08
+#define HANDLE_MIDDLE_RIGHT  0x10
+#define HANDLE_BOTTOM_LEFT   0x20
+#define HANDLE_BOTTOM_CENTER 0x40
+#define HANDLE_BOTTOM_RIGHT  0x80
 
-#define LOCK_NONE                0x00
-#define LOCK_ALL                 0xFF
-#define LOCK_VERTICES            0xA5
-#define LOCK_EDGES               0x5A
-#define LOCK_TOP_LEFT            0x2F
+#define ENABLE_ALL           0xFF
+#define ENABLE_VERTICES      0xA5 // TL|TR|BL|BR
+#define ENABLE_EDGES         0x5A // TC|ML|MR|BC
+#define ENABLE_RIGHTBOTTOM   0xD0 // MR|BC|BR
+
+#define LOCK_ALL             0x00
+#define LOCK_TOPLEFT         ENABLE_RIGHTBOTTOM
+#define LOCK_VERTICES        ENABLE_EDGES
+#define LOCK_EDGES           ENABLE_VERTICES
 
 typedef struct _window {
 	HWND hwnd;
