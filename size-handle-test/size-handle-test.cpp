@@ -12,6 +12,8 @@ WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 WCHAR szTargetLayerClass[MAX_LOADSTRING] = L"TargetWindowTest";
 WCHAR szTargetTitle[MAX_LOADSTRING] = L"Target Test Window";
+HWND hTarget = NULL;
+BOOL isPressedLB = FALSE;
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -20,6 +22,7 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK    TargetProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
+// bitblt: set src to NULL and use WHITNESS or BLACKNESS to clear buffer
 BOOL DrawHandle(HDC hdc, int x, int y, BOOL bEnable)
 {
     HDC hdcHandle, hdcMask; //, hdcMem
@@ -113,6 +116,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     return (int) msg.wParam;
 }
 
+// if want to stop WM_ERASEBKGND from repainting, set hbrBackGround to 
+// (HBRUSH)GetStockObject(HOLLOW_BRUSH);
+// so that the WM_PAINT can use double-bufferring to refresh client area and avoid flikering
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
     WNDCLASSEXW wcex;
@@ -126,7 +132,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.hInstance      = hInstance;
     wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_SIZEHANDLETEST));
     wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
+    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW + 1);
     wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_SIZEHANDLETEST);
     wcex.lpszClassName  = szWindowClass;
     wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
@@ -154,8 +160,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    hInst = hInstance; // Store instance handle in our global variable
 
-   HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
+   HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW/*WS_CHILDWINDOW | WS_VISIBLE | WS_CLIPSIBLINGS*/,
+      50, 50, 700, 400, nullptr, nullptr, hInstance, nullptr);
 
    if (!hWnd)
    {
@@ -165,9 +171,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    ShowWindow(hWnd, nCmdShow);
    UpdateWindow(hWnd);
 
-   HWND hTarget = CreateWindowEx(0, szTargetLayerClass, szTargetTitle,
+   hTarget = CreateWindowEx(0, szTargetLayerClass, szTargetTitle,
        WS_CAPTION | WS_CHILDWINDOW | WS_VISIBLE | WS_DISABLED | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_SYSMENU,
-       5, 5, 300, 250, hWnd, NULL, hInst, NULL);
+       7, 7, 300, 250, hWnd, NULL, hInst, NULL);
 
    if (!hTarget)
    {
@@ -177,14 +183,25 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    ShowWindow(hTarget, nCmdShow);
    UpdateWindow(hTarget);
 
+   HDC hdc = GetDC(hWnd);
+   DrawHandle(hdc, 0, 0, TRUE);
+   ReleaseDC(hWnd, hdc);
+
    return TRUE;
 }
 
+// TODO: Mouse inside moving, post WM_NCHITTEST message to target, x, y subtract by handle size
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
-    case WM_COMMAND:
+        case WM_CREATE:
+        {
+            CreateWindow(L"BUTTON", L"Move Left", WS_VISIBLE | WS_CHILD,
+                310, 10, 100, 20, hWnd, (HMENU)1000, hInst, nullptr);
+            break;
+        }
+        case WM_COMMAND:
         {
             int wmId = LOWORD(wParam);
             // Parse the menu selections:
@@ -196,23 +213,90 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             case IDM_EXIT:
                 DestroyWindow(hWnd);
                 break;
+            case 1000:
+                break;
             default:
                 return DefWindowProc(hWnd, message, wParam, lParam);
             }
         }
         break;
-    case WM_PAINT:
+        case WM_LBUTTONDOWN:
         {
+            OutputDebugString(L"Parent Mouse Down\n");
+            isPressedLB = TRUE;
+            InvalidateRect(hWnd, NULL, TRUE);
+            break;
+        }
+        case WM_LBUTTONUP:
+        {
+            OutputDebugString(L"Parent Mouse Up\n");
+            isPressedLB = FALSE;
+            InvalidateRect(hWnd, NULL, TRUE);
+            break;
+        }
+        /*case WM_ERASEBKGND:
+        {
+            OutputDebugString(L"Parent Paint Erase\n");
+            break;
+        }*/
+        case WM_PAINT:
+        {
+            OutputDebugString(L"Parent Paint\n");
+
+            RECT rect, rcTarget;
+            LONG width;
+            LONG height;
+
+            GetClientRect(hWnd, &rect);
+            GetWindowRect(hTarget, &rcTarget);
+            MapWindowPoints(HWND_DESKTOP, hWnd, (LPPOINT)&rcTarget, 2);
+
+            /*width = rect.right - rect.left;
+            height = rect.bottom - rect.top;
+
+            // Inflate invalid target window region
+            InflateRect(&rcTarget, 10, 10);
+            InvalidateRect(hWnd, NULL, FALSE);*/
+
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hWnd, &ps);
 
-            if (!DrawHandle(hdc, 0, 0, TRUE)) {
-                OutputDebugString(L"Error drawing handle\n");
-            }
+            /*HDC mem = CreateCompatibleDC(NULL);
+            HBITMAP canvas = CreateCompatibleBitmap(hdc, width, height);
+            HGDIOBJ old = SelectObject(mem, canvas);
+
+            FillRect(mem, &rect, (HBRUSH)GetStockObject(WHITE_BRUSH));
+            DrawHandle(mem, rcTarget.left - 5, rcTarget.top - 5, TRUE);
+            DrawHandle(mem, rcTarget.left, 0, TRUE);
+            DrawHandle(mem, 0, rcTarget.top, FALSE);
+            BitBlt(hdc, 0, 0, width, height, mem, 0, 0, SRCCOPY);
+
+            SelectObject(mem, old);
+            DeleteObject(canvas);
+            DeleteDC(mem);*/
 
             EndPaint(hWnd, &ps);
+
+            // post draw
+            if (!isPressedLB) {
+                InflateRect(&rcTarget, 6, 6);
+                width = rcTarget.right - rcTarget.left;
+                height = rcTarget.bottom - rcTarget.top;
+                hdc = GetDC(hWnd);
+                DrawHandle(hdc, rcTarget.left, rcTarget.top, TRUE);
+                DrawHandle(hdc, rcTarget.left + width / 2 - 3, rcTarget.top, TRUE);
+                DrawHandle(hdc, rcTarget.right - 6, rcTarget.top, TRUE);
+                DrawHandle(hdc, rcTarget.left, rcTarget.top + height / 2 - 3, TRUE);
+                //DrawHandle(hdc, rcTarget.left + width / 2 - 3, rcTarget.top + height / 2 - 3, TRUE);
+                DrawHandle(hdc, rcTarget.right - 6, rcTarget.top + height / 2 - 3, TRUE);
+                DrawHandle(hdc, rcTarget.left, rcTarget.bottom - 6, TRUE);
+                DrawHandle(hdc, rcTarget.left + width / 2 - 3, rcTarget.bottom - 6, TRUE);
+                DrawHandle(hdc, rcTarget.right - 6, rcTarget.bottom - 6, TRUE);
+                ReleaseDC(hWnd, hdc);
+            }
+
+            break;
         }
-        break;
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
@@ -237,8 +321,40 @@ LRESULT CALLBACK TargetProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         }
     }
     break;
+    case WM_NCHITTEST:
+    {
+        // if is a control: only return HTCAPTION (when inside) or HT(BORDER)
+        /*LRESULT hit = DefWindowProc(hWnd, message, wParam, lParam);
+        if (hit != HTNOWHERE) {
+            hit = HTCAPTION;
+        }
+        return hit;*/
+        break;
+    }
+    case WM_LBUTTONDOWN:
+    {
+        OutputDebugString(L"Target Mouse Down\n");
+        isPressedLB = TRUE;
+        InvalidateRect(GetParent(hWnd), NULL, TRUE);
+        //return DefWindowProc(hWnd, message, wParam, lParam);
+        break;
+    }
+    case WM_LBUTTONUP:
+    {
+        OutputDebugString(L"Target Mouse Up\n");
+        isPressedLB = FALSE;
+        InvalidateRect(GetParent(hWnd), NULL, TRUE);
+        return DefWindowProc(hWnd, message, wParam, lParam);
+        //break;
+    }
+    case WM_ERASEBKGND:
+    {
+        OutputDebugString(L"Target Erase\n");
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
     case WM_PAINT:
     {
+        OutputDebugString(L"Target Paint\n");
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hWnd, &ps);
         
