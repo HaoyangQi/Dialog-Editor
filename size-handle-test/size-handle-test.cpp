@@ -13,8 +13,9 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 WCHAR szTargetLayerClass[MAX_LOADSTRING] = L"TargetWindowTest";
 WCHAR szTargetTitle[MAX_LOADSTRING] = L"Target Test Window";
 
-HWND hTarget = NULL;
 BOOL bVisible = TRUE;
+
+WINDOW_DESIGNER designerData;
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -33,8 +34,92 @@ void debugCheckError(int pos) {
     }
 }
 
+void InitWindowDesigner(WINDOW_DESIGNER* pwd, HWND base, HWND target)
+{
+    BITMAP image;
+
+    pwd->hwndMain = base;
+    pwd->hwndTarget = target;
+
+    pwd->hdcHandleDisable = CreateCompatibleDC(NULL);
+    pwd->hdcHandleEnable = CreateCompatibleDC(NULL);
+    pwd->hdcMask = CreateCompatibleDC(NULL);
+    pwd->hdcTrack = CreateCompatibleDC(NULL);
+
+    pwd->bmpHandleEnable = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_HANDLE_ENABLE));
+    pwd->bmpHandleDisable = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_HANDLE_DISABLE));
+    pwd->penTrackPen = CreatePen(PS_DASH, 0, RGB(0, 0, 0));
+
+    // Fetch image dimension
+    GetObject(pwd->bmpHandleEnable, sizeof(BITMAP), &image);
+    pwd->imgWidth = image.bmWidth;
+    pwd->imgHeight = image.bmHeight;
+
+    pwd->bmpMask = CreateBitmap(image.bmWidth, image.bmHeight, 1, 1, NULL);
+
+    // Bind objects to DC and book-keep old object
+    pwd->oldHandleDisable = SelectObject(pwd->hdcHandleDisable, pwd->bmpHandleDisable);
+    pwd->oldHandleEnable = SelectObject(pwd->hdcHandleEnable, pwd->bmpHandleEnable);
+    pwd->oldMask = SelectObject(pwd->hdcMask, pwd->bmpMask);
+    pwd->oldSnapshot = GetCurrentObject(pwd->hdcTrack, OBJ_BITMAP);
+    pwd->oldTrackPen = SelectObject(pwd->hdcTrack, pwd->penTrackPen);
+}
+
+void ReleaseWindowDesigner(WINDOW_DESIGNER* pwd)
+{
+    SelectObject(pwd->hdcHandleDisable, pwd->oldHandleDisable);
+    SelectObject(pwd->hdcHandleEnable, pwd->oldHandleEnable);
+    SelectObject(pwd->hdcMask, pwd->oldMask);
+    SelectObject(pwd->hdcTrack, pwd->oldSnapshot);
+    SelectObject(pwd->hdcTrack, pwd->oldTrackPen);
+
+    DeleteObject(pwd->bmpHandleDisable);
+    DeleteObject(pwd->bmpHandleEnable);
+    DeleteObject(pwd->bmpMask);
+    DeleteObject(pwd->bmpSnapshot);
+    DeleteObject(pwd->oldTrackPen);
+
+    DeleteDC(pwd->hdcHandleDisable);
+    DeleteDC(pwd->hdcHandleEnable);
+    DeleteDC(pwd->hdcMask);
+    DeleteDC(pwd->hdcTrack);
+}
+
+void UpdateBufferSize(WINDOW_DESIGNER* pwd)
+{
+    RECT rect;
+    HDC hdc;
+
+    GetClientRect(pwd->hwndMain, &rect);
+    SelectObject(pwd->hdcTrack, pwd->oldSnapshot);
+    DeleteObject(pwd->bmpSnapshot);
+
+    hdc = GetDC(pwd->hwndMain);
+    pwd->bmpSnapshot = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
+    SelectObject(pwd->hdcTrack, pwd->bmpSnapshot);
+    ReleaseDC(pwd->hwndMain, hdc);
+}
+
+BOOL DrawHandle(WINDOW_DESIGNER* pwd, HDC hdc, int x, int y, BOOL bEnable)
+{
+    BOOL ret = TRUE;
+    HDC hdcHandle = bEnable ? pwd->hdcHandleEnable : pwd->hdcHandleDisable;
+
+    // When copying to mask, SetBkColor will set a color that cannot be represented in mask 
+    // to be converted to the default background color, which is white
+    // As for other color cannot be represented, they will be converted to forground color by default
+    SetBkColor(hdcHandle, RGB(255, 0, 255));
+
+    ret &= BitBlt(pwd->hdcMask, 0, 0, pwd->imgWidth, pwd->imgHeight, hdcHandle, 0, 0, SRCCOPY);
+    ret &= BitBlt(hdc, x, y, pwd->imgWidth, pwd->imgHeight, hdcHandle, 0, 0, SRCINVERT);
+    ret &= BitBlt(hdc, x, y, pwd->imgWidth, pwd->imgHeight, pwd->hdcMask, 0, 0, SRCAND);
+    ret &= BitBlt(hdc, x, y, pwd->imgWidth, pwd->imgHeight, hdcHandle, 0, 0, SRCINVERT);
+
+    return ret;
+}
+
 // bitblt: set src to NULL and use WHITNESS or BLACKNESS to clear buffer
-BOOL DrawHandle(HDC hdc, int x, int y, BOOL bEnable)
+/*BOOL DrawHandle(HDC hdc, int x, int y, BOOL bEnable)
 {
     HDC hdcHandle, hdcMask; //, hdcMem
     HBITMAP bmpHandleEnable, bmpHandleDisable, bmpMask; //, bmpMem
@@ -67,14 +152,14 @@ BOOL DrawHandle(HDC hdc, int x, int y, BOOL bEnable)
     SetBkColor(hdcHandle, RGB(255, 0, 255));
     BitBlt(hdcMask, 0, 0, width, height, hdcHandle, 0, 0, SRCCOPY);
 
-/*
+
     // Method 1, 1 access to DC
-    BitBlt(hdcMem, 0, 0, width, height, hdc, x, y, SRCCOPY);
-    BitBlt(hdcMem, 0, 0, width, height, hdcBlank, 0, 0, SRCINVERT);
-    BitBlt(hdcMem, 0, 0, width, height, hdcMask, 0, 0, SRCAND);
-    BitBlt(hdcMem, 0, 0, width, height, hdcHandle, 0, 0, SRCINVERT);
-    BitBlt(hdc, x, y, width, height, hdcMem, 0, 0, SRCCOPY);
-*/
+    //BitBlt(hdcMem, 0, 0, width, height, hdc, x, y, SRCCOPY);
+    //BitBlt(hdcMem, 0, 0, width, height, hdcBlank, 0, 0, SRCINVERT);
+    //BitBlt(hdcMem, 0, 0, width, height, hdcMask, 0, 0, SRCAND);
+    //BitBlt(hdcMem, 0, 0, width, height, hdcHandle, 0, 0, SRCINVERT);
+    //BitBlt(hdc, x, y, width, height, hdcMem, 0, 0, SRCCOPY);
+
 
     // Method 2, 3 access to DC
     ret &= BitBlt(hdc, x, y, width, height, hdcHandle, 0, 0, SRCINVERT);
@@ -93,7 +178,7 @@ BOOL DrawHandle(HDC hdc, int x, int y, BOOL bEnable)
     DeleteDC(hdcMask);
 
     return ret;
-}
+}*/
 
 BOOL DrawWindowHandles(HWND parent, HWND target, int dd, LONG flagEnableHandles)
 {
@@ -124,7 +209,8 @@ BOOL DrawWindowHandles(HWND parent, HWND target, int dd, LONG flagEnableHandles)
                 continue;
             }
 
-            ret &= DrawHandle(hdc, x, y, flagEnableHandles & 1);
+            //ret &= DrawHandle(hdc, x, y, flagEnableHandles & 1);
+            ret &= DrawHandle(&designerData, hdc, x, y, flagEnableHandles & 1);
             flagEnableHandles >>= 1;
         }
     }
@@ -170,9 +256,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     return (int) msg.wParam;
 }
 
-// if want to stop WM_ERASEBKGND from repainting, set hbrBackGround to 
-// (HBRUSH)GetStockObject(HOLLOW_BRUSH);
-// so that the WM_PAINT can use double-bufferring to refresh client area and avoid flikering
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
     WNDCLASSEXW wcex;
@@ -214,28 +297,30 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    hInst = hInstance; // Store instance handle in our global variable
 
-   HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW/*WS_CHILDWINDOW | WS_VISIBLE | WS_CLIPSIBLINGS*/,
+   InitWindowDesigner(&designerData, NULL, NULL);
+
+   designerData.hwndMain = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW/*WS_CHILDWINDOW | WS_VISIBLE | WS_CLIPSIBLINGS*/,
       50, 50, 700, 400, nullptr, nullptr, hInstance, nullptr);
 
-   if (!hWnd)
+   if (!designerData.hwndMain)
    {
       return FALSE;
    }
 
-   ShowWindow(hWnd, nCmdShow);
-   UpdateWindow(hWnd);
+   ShowWindow(designerData.hwndMain, nCmdShow);
+   UpdateWindow(designerData.hwndMain);
 
-   hTarget = CreateWindowEx(0, szTargetLayerClass, szTargetTitle,
+   designerData.hwndTarget = CreateWindowEx(0, szTargetLayerClass, szTargetTitle,
        WS_CAPTION | WS_CHILDWINDOW | WS_VISIBLE | WS_DISABLED | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_SYSMENU,
-       7, 7, 300, 250, hWnd, NULL, hInst, NULL);
+       7, 7, 300, 250, designerData.hwndMain, NULL, hInst, NULL);
 
-   if (!hTarget)
+   if (!designerData.hwndTarget)
    {
        return FALSE;
    }
 
-   ShowWindow(hTarget, nCmdShow);
-   UpdateWindow(hTarget);
+   ShowWindow(designerData.hwndTarget, nCmdShow);
+   UpdateWindow(designerData.hwndTarget);
 
    return TRUE;
 }
@@ -315,12 +400,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             //OutputDebugString(L"Parent Paint\n");
 
             // pre paint
-            RECT rect, rcTarget;
-            LONG width;
-            LONG height;
-            GetClientRect(hWnd, &rect);
-            GetWindowRect(hTarget, &rcTarget);
-            MapWindowPoints(HWND_DESKTOP, hWnd, (LPPOINT)&rcTarget, 2);
 
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hWnd, &ps);
@@ -330,12 +409,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             // post paint
             if (bVisible) {
-                DrawWindowHandles(hWnd, hTarget, 6, ENABLE_RIGHTBOTTOM);
+                DrawWindowHandles(hWnd, designerData.hwndTarget, 6, ENABLE_RIGHTBOTTOM);
             }
 
             break;
         }
     case WM_DESTROY:
+        ReleaseWindowDesigner(&designerData);
         PostQuitMessage(0);
         break;
     default:
@@ -396,7 +476,7 @@ LRESULT CALLBACK TargetProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hWnd, &ps);
         
-        if (!DrawHandle(hdc, 0, 0, FALSE)) {
+        if (!DrawHandle(&designerData, hdc, 0, 0, FALSE)) {
             OutputDebugString(L"Error drawing handle\n");
         }
 
