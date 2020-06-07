@@ -43,9 +43,9 @@ BOOL DrawHandle(HDC hdc, int x, int y, BOOL bEnable)
     LONG width, height;
     BOOL ret = TRUE;
     
-    //hdcMem = CreateCompatibleDC(hdc);
-    hdcMask = CreateCompatibleDC(hdc);
-    hdcHandle = CreateCompatibleDC(hdc);
+    //hdcMem = CreateCompatibleDC(NULL);
+    hdcMask = CreateCompatibleDC(NULL);
+    hdcHandle = CreateCompatibleDC(NULL);
 
     bmpHandleEnable = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_HANDLE_ENABLE));
     bmpHandleDisable = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_HANDLE_DISABLE));
