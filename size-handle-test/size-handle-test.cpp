@@ -14,8 +14,7 @@ WCHAR szTargetLayerClass[MAX_LOADSTRING] = L"TargetWindowTest";
 WCHAR szTargetTitle[MAX_LOADSTRING] = L"Target Test Window";
 
 HWND hTarget = NULL;
-BOOL isPressedLB = FALSE;
-
+BOOL bVisible = TRUE;
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -23,6 +22,16 @@ BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK    TargetProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
+
+void debugCheckError(int pos) {
+    DWORD err = GetLastError();
+    if (err != ERROR_SUCCESS) {
+        wchar_t buf[100] = L"\0";
+        swprintf_s(buf, 100, L"Error (at %d): %d\n", pos, err);
+        OutputDebugString(buf);
+        DebugBreak();
+    }
+}
 
 // bitblt: set src to NULL and use WHITNESS or BLACKNESS to clear buffer
 BOOL DrawHandle(HDC hdc, int x, int y, BOOL bEnable)
@@ -34,9 +43,9 @@ BOOL DrawHandle(HDC hdc, int x, int y, BOOL bEnable)
     LONG width, height;
     BOOL ret = TRUE;
     
-    //hdcMem = CreateCompatibleDC(NULL);
-    hdcMask = CreateCompatibleDC(NULL);
-    hdcHandle = CreateCompatibleDC(NULL);
+    //hdcMem = CreateCompatibleDC(hdc);
+    hdcMask = CreateCompatibleDC(hdc);
+    hdcHandle = CreateCompatibleDC(hdc);
 
     bmpHandleEnable = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_HANDLE_ENABLE));
     bmpHandleDisable = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_HANDLE_DISABLE));
@@ -57,6 +66,7 @@ BOOL DrawHandle(HDC hdc, int x, int y, BOOL bEnable)
     // As for other color cannot be represented, they will be converted to forground color by default
     SetBkColor(hdcHandle, RGB(255, 0, 255));
     BitBlt(hdcMask, 0, 0, width, height, hdcHandle, 0, 0, SRCCOPY);
+
 /*
     // Method 1, 1 access to DC
     BitBlt(hdcMem, 0, 0, width, height, hdc, x, y, SRCCOPY);
@@ -74,9 +84,10 @@ BOOL DrawHandle(HDC hdc, int x, int y, BOOL bEnable)
     //SelectObject(hdcMem, bmpMemOld);
     SelectObject(hdcHandle, bmpHandleOld);
     SelectObject(hdcMask, bmpMaskOld);
-    //DeleteObject(bmpMemOld);
-    DeleteObject(bmpHandleOld);
-    DeleteObject(bmpMaskOld);
+    //DeleteObject(bmpMem);
+    DeleteObject(bmpMask);
+    DeleteObject(bmpHandleEnable);
+    DeleteObject(bmpHandleDisable);
     //DeleteDC(hdcMem);
     DeleteDC(hdcHandle);
     DeleteDC(hdcMask);
@@ -261,29 +272,47 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
         case WM_LBUTTONDOWN:
         {
-            OutputDebugString(L"Parent Mouse Down\n");
-            isPressedLB = TRUE;
+            //OutputDebugString(L"Parent Mouse Down\n");
+            bVisible = FALSE;
             InvalidateRect(hWnd, NULL, TRUE);
             break;
         }
         case WM_LBUTTONUP:
         {
-            OutputDebugString(L"Parent Mouse Up\n");
-            isPressedLB = FALSE;
+            //OutputDebugString(L"Parent Mouse Up\n");
+            bVisible = TRUE;
             InvalidateRect(hWnd, NULL, TRUE);
             break;
         }
-        // TODO: Mouse Drag:
-        // 1. hit a control
-        // 2. hit nothing
-        // either case: lock target window update, move child BB (case 1) or a track rect (case 2)
-        // final: unlock target window, invalidate base window
-        // track rect: black rect and white frame in MEM DC, XOR with client DC
-        // => black part no effect, white part will invert the color
-        // => when another move come, use original mem XOR with DC again, then update mem
+        case WM_MOUSEMOVE:
+        {
+            // TODO: Mouse Drag:
+            // 1. hit a control
+            // 2. hit nothing
+            // either case: lock target window update, move child BB (case 1) or a track rect (case 2)
+            // final: unlock target window, invalidate base window
+            // track rect: black rect and white frame in MEM DC, XOR with client DC
+            // => black part no effect, white part will invert the color
+            // => when another move come, use original mem XOR with DC again, then update mem
+            if (wParam & MK_LBUTTON) {
+                ;
+            }
+            break;
+        }
+        case WM_SIZING:
+        {
+            //OutputDebugString(L"Sizing\n");
+            bVisible = FALSE;
+            break;
+        }
+        case WM_SIZE:
+        {
+            bVisible = TRUE;
+            break;
+        }
         case WM_PAINT:
         {
-            OutputDebugString(L"Parent Paint\n");
+            //OutputDebugString(L"Parent Paint\n");
 
             // pre paint
             RECT rect, rcTarget;
@@ -300,7 +329,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             EndPaint(hWnd, &ps);
 
             // post paint
-            if (!isPressedLB) {
+            if (bVisible) {
                 DrawWindowHandles(hWnd, hTarget, 6, ENABLE_RIGHTBOTTOM);
             }
 
@@ -330,14 +359,14 @@ LRESULT CALLBACK TargetProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         }
     }
     break;
-    case WM_NCHITTEST:
+    /*case WM_NCHITTEST:
     {
         // if is a control: only return HTCAPTION (when inside) or HT(BORDER)
-        /*LRESULT hit = DefWindowProc(hWnd, message, wParam, lParam);
+        LRESULT hit = DefWindowProc(hWnd, message, wParam, lParam);
         if (hit != HTNOWHERE) {
             hit = HTCAPTION;
         }
-        return hit;*/
+        return hit;
         break;
     }
     case WM_LBUTTONDOWN:
@@ -360,10 +389,10 @@ LRESULT CALLBACK TargetProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     {
         OutputDebugString(L"Target Erase\n");
         return DefWindowProc(hWnd, message, wParam, lParam);
-    }
+    }*/
     case WM_PAINT:
     {
-        OutputDebugString(L"Target Paint\n");
+        //OutputDebugString(L"Target Paint\n");
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hWnd, &ps);
         
