@@ -234,62 +234,47 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             InvalidateRect(hWnd, NULL, TRUE);
             break;
         }
-        /*case WM_ERASEBKGND:
-        {
-            OutputDebugString(L"Parent Paint Erase\n");
-            break;
-        }*/
+        // TODO: Mouse Drag:
+        // 1. hit a control
+        // 2. hit nothing
+        // either case: lock target window update, move child BB (case 1) or a track rect (case 2)
+        // final: unlock target window, invalidate base window
+        // track rect: black rect and white frame in MEM DC, XOR with client DC
+        // => black part no effect, white part will invert the color
+        // => when another move come, use original mem XOR with DC again, then update mem
         case WM_PAINT:
         {
             OutputDebugString(L"Parent Paint\n");
 
+            // pre paint
             RECT rect, rcTarget;
             LONG width;
             LONG height;
-
             GetClientRect(hWnd, &rect);
             GetWindowRect(hTarget, &rcTarget);
             MapWindowPoints(HWND_DESKTOP, hWnd, (LPPOINT)&rcTarget, 2);
 
-            /*width = rect.right - rect.left;
-            height = rect.bottom - rect.top;
-
-            // Inflate invalid target window region
-            InflateRect(&rcTarget, 10, 10);
-            InvalidateRect(hWnd, NULL, FALSE);*/
-
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hWnd, &ps);
-
-            /*HDC mem = CreateCompatibleDC(NULL);
-            HBITMAP canvas = CreateCompatibleBitmap(hdc, width, height);
-            HGDIOBJ old = SelectObject(mem, canvas);
-
-            FillRect(mem, &rect, (HBRUSH)GetStockObject(WHITE_BRUSH));
-            DrawHandle(mem, rcTarget.left - 5, rcTarget.top - 5, TRUE);
-            DrawHandle(mem, rcTarget.left, 0, TRUE);
-            DrawHandle(mem, 0, rcTarget.top, FALSE);
-            BitBlt(hdc, 0, 0, width, height, mem, 0, 0, SRCCOPY);
-
-            SelectObject(mem, old);
-            DeleteObject(canvas);
-            DeleteDC(mem);*/
-
+            // in paint: basically empty as only invalid regions will be paint constraint here
+            // hence: use double-buffering freshing window is not working here
             EndPaint(hWnd, &ps);
 
-            // post draw
+            // post paint
             if (!isPressedLB) {
                 InflateRect(&rcTarget, 6, 6);
                 width = rcTarget.right - rcTarget.left;
                 height = rcTarget.bottom - rcTarget.top;
                 hdc = GetDC(hWnd);
-                DrawHandle(hdc, rcTarget.left, rcTarget.top, TRUE);
-                DrawHandle(hdc, rcTarget.left + width / 2 - 3, rcTarget.top, TRUE);
-                DrawHandle(hdc, rcTarget.right - 6, rcTarget.top, TRUE);
-                DrawHandle(hdc, rcTarget.left, rcTarget.top + height / 2 - 3, TRUE);
-                //DrawHandle(hdc, rcTarget.left + width / 2 - 3, rcTarget.top + height / 2 - 3, TRUE);
+                // top lane
+                DrawHandle(hdc, rcTarget.left, rcTarget.top, FALSE);
+                DrawHandle(hdc, rcTarget.left + width / 2 - 3, rcTarget.top, FALSE);
+                DrawHandle(hdc, rcTarget.right - 6, rcTarget.top, FALSE);
+                // middle lane
+                DrawHandle(hdc, rcTarget.left, rcTarget.top + height / 2 - 3, FALSE);
                 DrawHandle(hdc, rcTarget.right - 6, rcTarget.top + height / 2 - 3, TRUE);
-                DrawHandle(hdc, rcTarget.left, rcTarget.bottom - 6, TRUE);
+                // bottom lane
+                DrawHandle(hdc, rcTarget.left, rcTarget.bottom - 6, FALSE);
                 DrawHandle(hdc, rcTarget.left + width / 2 - 3, rcTarget.bottom - 6, TRUE);
                 DrawHandle(hdc, rcTarget.right - 6, rcTarget.bottom - 6, TRUE);
                 ReleaseDC(hWnd, hdc);
