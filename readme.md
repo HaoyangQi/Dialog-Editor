@@ -89,3 +89,10 @@ case WM_PAINT:
 * If copying image, removing background color requires one additional **AND** to put a mask on destination, then XOR back.
 
 This part can definitely implement in pre-paint, but in-paint might override those changes.
+
+## TODO: focus-test
+includes delete test
+
+## TODO: scale-test
+
+## TODO: resource-interpreter-test

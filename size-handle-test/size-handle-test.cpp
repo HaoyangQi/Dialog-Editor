@@ -13,7 +13,7 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 WCHAR szTargetLayerClass[MAX_LOADSTRING] = L"TargetWindowTest";
 WCHAR szTargetTitle[MAX_LOADSTRING] = L"Target Test Window";
 
-BOOL bVisible = TRUE;
+//BOOL bVisible = TRUE;
 
 WINDOW_DESIGNER designerData;
 
@@ -37,21 +37,18 @@ void debugCheckError(int pos) {
 void InitWindowDesigner(WINDOW_DESIGNER* pwd)
 {
     BITMAP image;
-    HDC hdc;
+    //HDC hdc;
 
     pwd->hwndMain = NULL;
     pwd->hwndTarget = NULL;
+    pwd->bVisible = TRUE;
 
     pwd->hdcHandleDisable = CreateCompatibleDC(NULL);
     pwd->hdcHandleEnable = CreateCompatibleDC(NULL);
     pwd->hdcMask = CreateCompatibleDC(NULL);
-    pwd->hdcTrack = CreateCompatibleDC(NULL);
-    pwd->hdcSnapshot = CreateCompatibleDC(NULL);
 
     pwd->bmpHandleEnable = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_HANDLE_ENABLE));
     pwd->bmpHandleDisable = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_HANDLE_DISABLE));
-    pwd->penTrackPen = CreatePen(PS_DASH, 0, RGB(0, 0, 0));
-    pwd->brTrackBrush = GetStockBrush(NULL_BRUSH);
 
     // Fetch image dimension
     GetObject(pwd->bmpHandleEnable, sizeof(BITMAP), &image);
@@ -64,16 +61,6 @@ void InitWindowDesigner(WINDOW_DESIGNER* pwd)
     pwd->oldHandleDisable = SelectObject(pwd->hdcHandleDisable, pwd->bmpHandleDisable);
     pwd->oldHandleEnable = SelectObject(pwd->hdcHandleEnable, pwd->bmpHandleEnable);
     pwd->oldMask = SelectObject(pwd->hdcMask, pwd->bmpMask);
-    pwd->oldTrackPen = SelectObject(pwd->hdcTrack, pwd->penTrackPen);
-    pwd->oldTrackBrush = SelectObject(pwd->hdcTrack, pwd->brTrackBrush);
-    pwd->oldTrackBuffer = GetCurrentObject(pwd->hdcTrack, OBJ_BITMAP);
-    pwd->oldSnapshot = GetCurrentObject(pwd->hdcSnapshot, OBJ_BITMAP);
-
-    // track buffer and snapshot buffer will be set in WM_CREATE
-    // because this process should be completed before any message being processed
-    // hence before all CreateWindow call
-    pwd->bmpTrackBuffer = NULL;
-    pwd->bmpSnapshot = NULL;
 }
 
 void ReleaseWindowDesigner(WINDOW_DESIGNER* pwd)
@@ -82,54 +69,16 @@ void ReleaseWindowDesigner(WINDOW_DESIGNER* pwd)
     SelectObject(pwd->hdcHandleDisable, pwd->oldHandleDisable);
     SelectObject(pwd->hdcHandleEnable, pwd->oldHandleEnable);
     SelectObject(pwd->hdcMask, pwd->oldMask);
-    SelectObject(pwd->hdcTrack, pwd->oldTrackBuffer);
-    SelectObject(pwd->hdcTrack, pwd->oldTrackPen);
-    SelectObject(pwd->hdcTrack, pwd->oldTrackBrush);
-    SelectObject(pwd->hdcSnapshot, pwd->oldSnapshot);
 
     // release objects
     DeleteObject(pwd->bmpHandleDisable);
     DeleteObject(pwd->bmpHandleEnable);
     DeleteObject(pwd->bmpMask);
-    DeleteObject(pwd->bmpSnapshot);
-    DeleteObject(pwd->penTrackPen);
-    DeleteObject(pwd->brTrackBrush);
-    DeleteObject(pwd->bmpTrackBuffer);
 
     // release DCs
     DeleteDC(pwd->hdcHandleDisable);
     DeleteDC(pwd->hdcHandleEnable);
     DeleteDC(pwd->hdcMask);
-    DeleteDC(pwd->hdcTrack);
-    DeleteDC(pwd->hdcSnapshot);
-}
-
-void UpdateTrackBufferSize(WINDOW_DESIGNER* pwd, HWND hwnd)
-{
-    RECT rect;
-    HDC hdc;
-
-    GetClientRect(hwnd, &rect);
-    SelectObject(pwd->hdcTrack, pwd->oldTrackBuffer);
-    SelectObject(pwd->hdcSnapshot, pwd->oldSnapshot);
-
-    if (pwd->bmpTrackBuffer) {
-        DeleteObject(pwd->bmpTrackBuffer);
-    }
-    if (pwd->bmpSnapshot) {
-        DeleteObject(pwd->bmpSnapshot);
-    }
-
-    hdc = GetDC(hwnd);
-    pwd->szBuffer.cx = rect.right;
-    pwd->szBuffer.cy = rect.bottom;
-    pwd->bmpTrackBuffer = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
-    pwd->bmpSnapshot = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
-    pwd->oldTrackBuffer = SelectObject(pwd->hdcTrack, pwd->bmpTrackBuffer);
-    pwd->oldSnapshot = SelectObject(pwd->hdcSnapshot, pwd->bmpSnapshot);
-    BitBlt(pwd->hdcTrack, 0, 0, rect.right, rect.bottom, hdc, 0, 0, SRCCOPY);
-    BitBlt(pwd->hdcSnapshot, 0, 0, rect.right, rect.bottom, hdc, 0, 0, SRCCOPY);
-    ReleaseDC(hwnd, hdc);
 }
 
 BOOL DrawHandle(WINDOW_DESIGNER* pwd, HDC hdc, int x, int y, BOOL bEnable)
@@ -150,81 +99,19 @@ BOOL DrawHandle(WINDOW_DESIGNER* pwd, HDC hdc, int x, int y, BOOL bEnable)
     return ret;
 }
 
-// bitblt: set src to NULL and use WHITNESS or BLACKNESS to clear buffer
-/*BOOL DrawHandle(HDC hdc, int x, int y, BOOL bEnable)
-{
-    HDC hdcHandle, hdcMask; //, hdcMem
-    HBITMAP bmpHandleEnable, bmpHandleDisable, bmpMask; //, bmpMem
-    HGDIOBJ bmpHandleOld, bmpMaskOld; //, bmpMemOld
-    BITMAP image;
-    LONG width, height;
-    BOOL ret = TRUE;
-    
-    //hdcMem = CreateCompatibleDC(NULL);
-    hdcMask = CreateCompatibleDC(NULL);
-    hdcHandle = CreateCompatibleDC(NULL);
-
-    bmpHandleEnable = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_HANDLE_ENABLE));
-    bmpHandleDisable = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_HANDLE_DISABLE));
-
-    // fetch image dimension
-    GetObject(bmpHandleEnable, sizeof(BITMAP), &image);
-    width = image.bmWidth;
-    height = image.bmHeight;
-    bmpMask = CreateBitmap(width, height, 1, 1, NULL);
-    //bmpMem = CreateCompatibleBitmap(hdc, width, height);
-
-    //bmpMemOld = SelectObject(hdcMem, bmpMem);
-    bmpHandleOld = SelectObject(hdcHandle, bEnable ? bmpHandleEnable : bmpHandleDisable);
-    bmpMaskOld = SelectObject(hdcMask, bmpMask);
-
-    // When copying to mask, SetBkColor will set a color that cannot be represented in mask 
-    // to be converted to the default background color, which is white
-    // As for other color cannot be represented, they will be converted to forground color by default
-    SetBkColor(hdcHandle, RGB(255, 0, 255));
-    BitBlt(hdcMask, 0, 0, width, height, hdcHandle, 0, 0, SRCCOPY);
-
-
-    // Method 1, 1 access to DC
-    //BitBlt(hdcMem, 0, 0, width, height, hdc, x, y, SRCCOPY);
-    //BitBlt(hdcMem, 0, 0, width, height, hdcBlank, 0, 0, SRCINVERT);
-    //BitBlt(hdcMem, 0, 0, width, height, hdcMask, 0, 0, SRCAND);
-    //BitBlt(hdcMem, 0, 0, width, height, hdcHandle, 0, 0, SRCINVERT);
-    //BitBlt(hdc, x, y, width, height, hdcMem, 0, 0, SRCCOPY);
-
-
-    // Method 2, 3 access to DC
-    ret &= BitBlt(hdc, x, y, width, height, hdcHandle, 0, 0, SRCINVERT);
-    ret &= BitBlt(hdc, x, y, width, height, hdcMask, 0, 0, SRCAND);
-    ret &= BitBlt(hdc, x, y, width, height, hdcHandle, 0, 0, SRCINVERT);
-
-    //SelectObject(hdcMem, bmpMemOld);
-    SelectObject(hdcHandle, bmpHandleOld);
-    SelectObject(hdcMask, bmpMaskOld);
-    //DeleteObject(bmpMem);
-    DeleteObject(bmpMask);
-    DeleteObject(bmpHandleEnable);
-    DeleteObject(bmpHandleDisable);
-    //DeleteDC(hdcMem);
-    DeleteDC(hdcHandle);
-    DeleteDC(hdcMask);
-
-    return ret;
-}*/
-
-BOOL DrawWindowHandles(HWND parent, HWND target, int dd, LONG flagEnableHandles)
+BOOL DrawWindowHandles(WINDOW_DESIGNER* pwd, HDC hdc, HWND target, int dd, LONG flagEnableHandles)
 {
     BOOL ret = TRUE;
     RECT rcTarget;
     LONG width, height, step_x, step_y;
-    HDC hdc;
+    //HDC hdc;
 
-    if (!IsChild(parent, target)) {
+    if (!IsChild(pwd->hwndMain, target)) {
         return FALSE;
     }
 
     GetWindowRect(target, &rcTarget);
-    MapWindowPoints(HWND_DESKTOP, parent, (LPPOINT)&rcTarget, 2);
+    MapWindowPoints(HWND_DESKTOP, pwd->hwndMain, (LPPOINT)&rcTarget, 2);
     InflateRect(&rcTarget, dd, dd);
 
     width = rcTarget.right - rcTarget.left;
@@ -232,7 +119,7 @@ BOOL DrawWindowHandles(HWND parent, HWND target, int dd, LONG flagEnableHandles)
     step_x = (width - dd) / 2;
     step_y = (height - dd) / 2;
 
-    hdc = GetDC(parent);
+    //hdc = GetDC(parent);
 
     for (int y = rcTarget.top, index = 0; y <= height; y += step_y) {
         for (int x = rcTarget.left; x <= width; x += step_x) {
@@ -241,13 +128,12 @@ BOOL DrawWindowHandles(HWND parent, HWND target, int dd, LONG flagEnableHandles)
                 continue;
             }
 
-            //ret &= DrawHandle(hdc, x, y, flagEnableHandles & 1);
-            ret &= DrawHandle(&designerData, hdc, x, y, flagEnableHandles & 1);
+            ret &= DrawHandle(pwd, hdc, x, y, flagEnableHandles & 1);
             flagEnableHandles >>= 1;
         }
     }
     
-    ReleaseDC(parent, hdc);
+    //ReleaseDC(parent, hdc);
 
     return ret;
 }
@@ -354,6 +240,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    ShowWindow(designerData.hwndTarget, nCmdShow);
    UpdateWindow(designerData.hwndTarget);
 
+   // Force refresh everything
+   UpdateWindow(designerData.hwndMain);
+
    return TRUE;
 }
 
@@ -366,10 +255,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         {
             CreateWindow(L"BUTTON", L"Move Left", WS_VISIBLE | WS_CHILD,
                 310, 10, 100, 20, hWnd, (HMENU)1000, hInst, nullptr);
-
-            // create track buffer
-            UpdateTrackBufferSize(&designerData, hWnd);
-
             break;
         }
         case WM_COMMAND:
@@ -395,25 +280,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         {
             LONG x = GET_X_LPARAM(lParam);
             LONG y = GET_Y_LPARAM(lParam);
-            //OutputDebugString(L"Parent Mouse Down\n");
-            bVisible = FALSE;
+
+            designerData.bVisible = FALSE;
             designerData.ptTrackStart.x = x;
             designerData.ptTrackStart.y = y;
-            SetRect(&(designerData.rcTrackPrev), x, y, x, y);
+            SetRect(&designerData.rcTrackPrev, x, y, x, y);
 
-            HDC hdc = GetDC(hWnd);
-            BitBlt(designerData.hdcTrack, 0, 0, designerData.szBuffer.cx, designerData.szBuffer.cy, hdc, 0, 0, SRCCOPY);
-            BitBlt(designerData.hdcSnapshot, 0, 0, designerData.szBuffer.cx, designerData.szBuffer.cy, hdc, 0, 0, SRCCOPY);
-            ReleaseDC(hWnd, hdc);
             // TODO: SetCapture
-            // TODO: shold force update before bitblt
             InvalidateRect(hWnd, NULL, TRUE);
             break;
         }
         case WM_LBUTTONUP:
         {
-            //OutputDebugString(L"Parent Mouse Up\n");
-            bVisible = TRUE;
+            designerData.bVisible = TRUE;
             InvalidateRect(hWnd, NULL, TRUE);
             break;
         }
@@ -437,59 +316,53 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 y = min(designerData.ptTrackStart.y, y);
 
                 HDC hdc = GetDC(hWnd);
-                BitBlt(designerData.hdcTrack, 0, 0, designerData.szBuffer.cx, designerData.szBuffer.cy, 
-                    designerData.hdcSnapshot, 0, 0, SRCCOPY);
-                BitBlt(hdc, 
-                    designerData.rcTrackPrev.left, 
-                    designerData.rcTrackPrev.top,
-                    designerData.rcTrackPrev.right - designerData.rcTrackPrev.left, 
-                    designerData.rcTrackPrev.bottom - designerData.rcTrackPrev.top,
-                    designerData.hdcSnapshot, 
-                    designerData.rcTrackPrev.left,
-                    designerData.rcTrackPrev.top, SRCCOPY);
-                Rectangle(designerData.hdcTrack, x, y, x + trackW, y + trackH);
-                /*RECT tcrc;
-                SetRect(&tcrc, x, y, x + trackW, y + trackH);
-                FrameRect(designerData.hdcTrack, &tcrc, GetStockBrush(BLACK_BRUSH));*/
-                BitBlt(hdc, x, y, trackW, trackH, designerData.hdcTrack, x, y, SRCCOPY);
+
+                DrawFocusRect(hdc, &designerData.rcTrackPrev);
+                SetRect(&designerData.rcTrackPrev, x, y, x + trackW, y + trackH);
+                DrawFocusRect(hdc, &designerData.rcTrackPrev);
+
                 ReleaseDC(hWnd, hdc);
-
-                SetRect(&(designerData.rcTrackPrev), x, y, x + trackW, y + trackH);
-
-                break;
             }
+
+            POINT pt;
+            GetCursorPos(&pt);
+            LRESULT ret = DefWindowProc(designerData.hwndTarget, WM_NCHITTEST, 0, MAKELPARAM(pt.x, pt.y));
+            if (ret != HTNOWHERE) {
+                wchar_t buf[100] = L"\0";
+                swprintf_s(buf, 100, L"hit %d\n", ret);
+                OutputDebugString(buf);
+            }
+
+            break;
         }
         case WM_SIZING:
         {
             //OutputDebugString(L"Sizing\n");
-            bVisible = FALSE;
+            designerData.bVisible = FALSE;
             break;
         }
         case WM_SIZE:
         {
-            bVisible = TRUE;
+            designerData.bVisible = TRUE;
             if (wParam == SIZE_RESTORED) {
-                UpdateTrackBufferSize(&designerData, hWnd);
+                ;// UpdateTrackBufferSize(&designerData, hWnd);
             }
             break;
         }
         case WM_PAINT:
         {
-            //OutputDebugString(L"Parent Paint\n");
-
-            // pre paint
-
             PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hWnd, &ps);
-            // in paint: basically empty as only invalid regions will be paint constraint here
-            // hence: use double-buffering freshing window is not working here
-            EndPaint(hWnd, &ps);
+            HDC hdc;
+            
+            BeginPaint(hWnd, &ps);
 
-            // post paint
-            if (bVisible) {
-                DrawWindowHandles(hWnd, designerData.hwndTarget, 6, ENABLE_RIGHTBOTTOM);
+            if (designerData.bVisible) {
+                hdc = GetDC(hWnd);
+                DrawWindowHandles(&designerData, hdc, designerData.hwndTarget, 6, ENABLE_RIGHTBOTTOM);
+                ReleaseDC(hWnd, hdc);
             }
 
+            EndPaint(hWnd, &ps);
             break;
         }
     case WM_DESTROY:

@@ -38,20 +38,9 @@ typedef struct {
 	HDC hdcMask;
 	LONG imgWidth;
 	LONG imgHeight;
+	BOOL bVisible;
 
 	// Track rectangle: 
-	HBITMAP bmpSnapshot;
-	HBITMAP bmpTrackBuffer;
-	HPEN penTrackPen;
-	HBRUSH brTrackBrush;
-	HGDIOBJ oldSnapshot;
-	HGDIOBJ oldTrackBuffer;
-	HGDIOBJ oldTrackPen;
-	HGDIOBJ oldTrackBrush;
-	HDC hdcSnapshot;
-	HDC hdcTrack;
 	POINT ptTrackStart;
-	SIZE szBuffer;
 	RECT rcTrackPrev;
-	//SIZE szTrackPrev;
 } WINDOW_DESIGNER;
