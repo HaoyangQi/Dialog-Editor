@@ -104,7 +104,6 @@ BOOL DrawWindowHandles(WINDOW_DESIGNER* pwd, HDC hdc, HWND target, int dd, LONG 
     BOOL ret = TRUE;
     RECT rcTarget;
     LONG width, height, step_x, step_y;
-    //HDC hdc;
 
     if (!IsChild(pwd->hwndMain, target)) {
         return FALSE;
@@ -119,8 +118,6 @@ BOOL DrawWindowHandles(WINDOW_DESIGNER* pwd, HDC hdc, HWND target, int dd, LONG 
     step_x = (width - dd) / 2;
     step_y = (height - dd) / 2;
 
-    //hdc = GetDC(parent);
-
     for (int y = rcTarget.top, index = 0; y <= height; y += step_y) {
         for (int x = rcTarget.left; x <= width; x += step_x) {
             // skip center
@@ -132,8 +129,6 @@ BOOL DrawWindowHandles(WINDOW_DESIGNER* pwd, HDC hdc, HWND target, int dd, LONG 
             flagEnableHandles >>= 1;
         }
     }
-    
-    //ReleaseDC(parent, hdc);
 
     return ret;
 }
@@ -213,37 +208,37 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
-   hInst = hInstance; // Store instance handle in our global variable
+	hInst = hInstance; // Store instance handle in our global variable
 
-   InitWindowDesigner(&designerData);
+	InitWindowDesigner(&designerData);
 
-   designerData.hwndMain = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW/*WS_CHILDWINDOW | WS_VISIBLE | WS_CLIPSIBLINGS*/,
-      50, 50, 700, 400, nullptr, nullptr, hInstance, nullptr);
+	designerData.hwndMain = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW/*WS_CHILDWINDOW | WS_VISIBLE | WS_CLIPSIBLINGS*/,
+		50, 50, 700, 400, nullptr, nullptr, hInstance, nullptr);
 
-   if (!designerData.hwndMain)
-   {
-      return FALSE;
-   }
+	if (!designerData.hwndMain)
+	{
+		return FALSE;
+	}
 
-   ShowWindow(designerData.hwndMain, nCmdShow);
-   UpdateWindow(designerData.hwndMain);
+	ShowWindow(designerData.hwndMain, nCmdShow);
+	UpdateWindow(designerData.hwndMain);
 
-   designerData.hwndTarget = CreateWindowEx(0, szTargetLayerClass, szTargetTitle,
-       WS_CAPTION | WS_CHILDWINDOW | WS_VISIBLE | WS_DISABLED | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_SYSMENU,
-       7, 7, 300, 250, designerData.hwndMain, NULL, hInst, NULL);
+	designerData.hwndTarget = CreateWindowEx(0, szTargetLayerClass, szTargetTitle,
+		WS_CAPTION | WS_CHILDWINDOW | WS_VISIBLE | WS_DISABLED | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_SYSMENU,
+		7, 7, 300, 250, designerData.hwndMain, NULL, hInst, NULL);
 
-   if (!designerData.hwndTarget)
-   {
-       return FALSE;
-   }
+	if (!designerData.hwndTarget)
+	{
+		return FALSE;
+	}
 
-   ShowWindow(designerData.hwndTarget, nCmdShow);
-   UpdateWindow(designerData.hwndTarget);
+	ShowWindow(designerData.hwndTarget, nCmdShow);
+	UpdateWindow(designerData.hwndTarget);
 
-   // Force refresh everything
-   UpdateWindow(designerData.hwndMain);
+	// Force refresh everything
+	UpdateWindow(designerData.hwndMain);
 
-   return TRUE;
+	return TRUE;
 }
 
 // TODO: Mouse inside moving, post WM_NCHITTEST message to target, x, y subtract by handle size
@@ -253,7 +248,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
         case WM_CREATE:
         {
-            CreateWindow(L"BUTTON", L"Move Left", WS_VISIBLE | WS_CHILD,
+            CreateWindow(L"BUTTON", L"Test", WS_VISIBLE | WS_CHILD,
                 310, 10, 100, 20, hWnd, (HMENU)1000, hInst, nullptr);
             break;
         }
@@ -286,8 +281,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             designerData.ptTrackStart.y = y;
             SetRect(&designerData.rcTrackPrev, x, y, x, y);
 
-            // TODO: SetCapture
             InvalidateRect(hWnd, NULL, TRUE);
+
+            // TODO: SetCapture
+
+            // TODO: ChildWindowFromPoint: test which control is hit
+            // it does not test grandchild, so need to test over both windows
+
             break;
         }
         case WM_LBUTTONUP:
@@ -317,6 +317,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
                 HDC hdc = GetDC(hWnd);
 
+                // DrawFocusRect is XOR, re-apply on same rect twice will erase it (no effect)
                 DrawFocusRect(hdc, &designerData.rcTrackPrev);
                 SetRect(&designerData.rcTrackPrev, x, y, x + trackW, y + trackH);
                 DrawFocusRect(hdc, &designerData.rcTrackPrev);
@@ -329,7 +330,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             LRESULT ret = DefWindowProc(designerData.hwndTarget, WM_NCHITTEST, 0, MAKELPARAM(pt.x, pt.y));
             if (ret != HTNOWHERE) {
                 wchar_t buf[100] = L"\0";
-                swprintf_s(buf, 100, L"hit %d\n", ret);
+                swprintf_s(buf, 100, L"hit %lld\n", ret);
                 OutputDebugString(buf);
             }
 
@@ -345,24 +346,27 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         {
             designerData.bVisible = TRUE;
             if (wParam == SIZE_RESTORED) {
-                ;// UpdateTrackBufferSize(&designerData, hWnd);
+                ;
             }
             break;
         }
         case WM_PAINT:
         {
+            OutputDebugString(L"Parent Paint\n");
             PAINTSTRUCT ps;
             HDC hdc;
             
             BeginPaint(hWnd, &ps);
-
             if (designerData.bVisible) {
                 hdc = GetDC(hWnd);
                 DrawWindowHandles(&designerData, hdc, designerData.hwndTarget, 6, ENABLE_RIGHTBOTTOM);
                 ReleaseDC(hWnd, hdc);
             }
-
             EndPaint(hWnd, &ps);
+
+            // fall-through the re-paint
+            RedrawWindow(designerData.hwndTarget, NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN);
+
             break;
         }
     case WM_DESTROY:
@@ -377,8 +381,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 LRESULT CALLBACK TargetProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+    static HWND btn;
+
     switch (message)
     {
+    case WM_CREATE:
+    {
+        btn = CreateWindow(L"BUTTON", L"Test", WS_VISIBLE | WS_CHILD,
+            20, 10, 100, 20, hWnd, NULL, hInst, nullptr);
+        break;
+    }
     case WM_COMMAND:
     {
         int wmId = LOWORD(wParam);
@@ -390,49 +402,17 @@ LRESULT CALLBACK TargetProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         }
     }
     break;
-    /*case WM_NCHITTEST:
+    /*case WM_PAINT:
     {
-        // if is a control: only return HTCAPTION (when inside) or HT(BORDER)
-        LRESULT hit = DefWindowProc(hWnd, message, wParam, lParam);
-        if (hit != HTNOWHERE) {
-            hit = HTCAPTION;
-        }
-        return hit;
-        break;
-    }
-    case WM_LBUTTONDOWN:
-    {
-        OutputDebugString(L"Target Mouse Down\n");
-        isPressedLB = TRUE;
-        InvalidateRect(GetParent(hWnd), NULL, TRUE);
-        //return DefWindowProc(hWnd, message, wParam, lParam);
-        break;
-    }
-    case WM_LBUTTONUP:
-    {
-        OutputDebugString(L"Target Mouse Up\n");
-        isPressedLB = FALSE;
-        InvalidateRect(GetParent(hWnd), NULL, TRUE);
-        return DefWindowProc(hWnd, message, wParam, lParam);
-        //break;
-    }
-    case WM_ERASEBKGND:
-    {
-        OutputDebugString(L"Target Erase\n");
-        return DefWindowProc(hWnd, message, wParam, lParam);
-    }*/
-    case WM_PAINT:
-    {
-        //OutputDebugString(L"Target Paint\n");
+        OutputDebugString(L"Target Paint\n");
         PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hWnd, &ps);
-        
-        if (!DrawHandle(&designerData, hdc, 0, 0, FALSE)) {
-            OutputDebugString(L"Error drawing handle\n");
-        }
+        HDC hdc;
 
+        hdc = BeginPaint(hWnd, &ps);
         EndPaint(hWnd, &ps);
-    }
+
+        //InvalidateRect(btn, NULL, TRUE);
+    }*/
     break;
     case WM_DESTROY:
         PostQuitMessage(0);
