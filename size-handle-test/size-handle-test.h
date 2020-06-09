@@ -41,9 +41,10 @@ typedef struct {
 	LONG imgHeight;
 	BOOL bVisible;
 
-	// Track rectangle: 
+	// Mouse Track & Capture
 	POINT ptTrackStart;
 	RECT rcTrackPrev;
+	RECT rcSelectionBB;
 
 	// Controls and Selection
 	WINDOW_LIST* listDialogControls;

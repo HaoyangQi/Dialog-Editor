@@ -315,11 +315,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             pt.y = y;
             HWND hit = ChildWindowFromPoint(hWnd, pt);
             if (hit != NULL && hit != hWnd) {
+                // if hitting target window, keep descending
                 focus = hit;
                 MapWindowPoints(hWnd, designerData.hwndTarget, &pt, 1);
                 hit = ChildWindowFromPoint(designerData.hwndTarget, pt);
                 if (hit != NULL && hit != designerData.hwndTarget) {
+                    // TODO: if hit a control, set bounding box
+                    // current test is just for single control ONLY
                     focus = hit;
+                    GetWindowRect(hit, &designerData.rcSelectionBB);
+                    MapWindowPoints(HWND_DESKTOP, hWnd, (LPPOINT)&designerData.rcSelectionBB, 2);
                 }
             }
             else {
@@ -330,12 +335,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             // immediate update 1 frame to show focus change (pre-drag)
             RedrawWindow(hWnd, NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW | RDW_ERASE);
 
-            break;
-        }
-        case WM_LBUTTONUP:
-        {
-            designerData.bVisible = TRUE;
-            InvalidateRect(hWnd, NULL, TRUE);
             break;
         }
         case WM_MOUSEMOVE:
@@ -358,22 +357,56 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
                 LONG x = GET_X_LPARAM(lParam);
                 LONG y = GET_Y_LPARAM(lParam);
-                LONG trackW = abs(designerData.ptTrackStart.x - x);
-                LONG trackH = abs(designerData.ptTrackStart.y - y);
 
-                x = min(designerData.ptTrackStart.x, x);
-                y = min(designerData.ptTrackStart.y, y);
+                if (focus == designerData.hwndTarget) {
+                    // if not hitting a control, show selection track rectangle
+                    LONG trackW = abs(designerData.ptTrackStart.x - x);
+                    LONG trackH = abs(designerData.ptTrackStart.y - y);
 
-                HDC hdc = GetDC(hWnd);
+                    x = min(designerData.ptTrackStart.x, x);
+                    y = min(designerData.ptTrackStart.y, y);
 
-                // DrawFocusRect is XOR, re-apply on same rect twice will erase it (no effect)
-                DrawFocusRect(hdc, &designerData.rcTrackPrev);
-                SetRect(&designerData.rcTrackPrev, x, y, x + trackW, y + trackH);
-                DrawFocusRect(hdc, &designerData.rcTrackPrev);
+                    HDC hdc = GetDC(hWnd);
 
-                ReleaseDC(hWnd, hdc);
+                    // DrawFocusRect is XOR, re-apply on same rect twice will erase it (no effect)
+                    DrawFocusRect(hdc, &designerData.rcTrackPrev);
+                    SetRect(&designerData.rcTrackPrev, x, y, x + trackW, y + trackH);
+                    DrawFocusRect(hdc, &designerData.rcTrackPrev);
+
+                    ReleaseDC(hWnd, hdc);
+                }
+                else {
+                    // if hitting a control, move selection bounding box
+                    LONG dx = x - designerData.ptTrackStart.x;
+                    LONG dy = y - designerData.ptTrackStart.y;
+
+                    HDC hdc = GetDC(hWnd);
+
+                    DrawFocusRect(hdc, &designerData.rcSelectionBB);
+                    OffsetRect(&designerData.rcSelectionBB, dx, dy);
+                    DrawFocusRect(hdc, &designerData.rcSelectionBB);
+
+                    ReleaseDC(hWnd, hdc);
+
+                    designerData.ptTrackStart.x = x;
+                    designerData.ptTrackStart.y = y;
+                }
             }
 
+            break;
+        }
+        case WM_LBUTTONUP:
+        {
+            designerData.bVisible = TRUE;
+            if (focus != designerData.hwndTarget) {
+                MapWindowPoints(hWnd, designerData.hwndTarget, (LPPOINT)&designerData.rcSelectionBB, 2);
+                MoveWindow(focus,
+                    designerData.rcSelectionBB.left, designerData.rcSelectionBB.top,
+                    designerData.rcSelectionBB.right - designerData.rcSelectionBB.left,
+                    designerData.rcSelectionBB.bottom - designerData.rcSelectionBB.top,
+                    FALSE);
+            }
+            InvalidateRect(hWnd, NULL, TRUE);
             break;
         }
         case WM_SIZING:
