@@ -148,6 +148,62 @@ BOOL DrawWindowHandles(WINDOW_DESIGNER* pwd, HWND target, int dd, LONG flagEnabl
     return ret;
 }
 
+// point in base window coordinates
+BOOL IsHoveringOnHandles(WINDOW_DESIGNER* pwd, HWND target, int dd, POINT pt)
+{
+    RECT rcWindow, rcInflate, rcSquare;
+    LONG propHandle;
+    LONG width, height, step_x, step_y;
+
+    // TODO: make get rect part outside, in LB down msg
+    if (!GetWindowRect(target, &rcInflate)) {
+        return FALSE;
+    }
+    
+    MapWindowPoints(HWND_DESKTOP, pwd->hwndMain, (LPPOINT)&rcInflate, 2);
+    CopyRect(&rcWindow, &rcInflate);
+    InflateRect(&rcInflate, dd, dd);
+
+    width = rcInflate.right - rcInflate.left;
+    height = rcInflate.bottom - rcInflate.top;
+    step_x = (width - dd) / 2;
+    step_y = (height - dd) / 2;
+
+    if (PtInRect(&rcInflate, pt) && !PtInRect(&rcWindow, pt)) {
+        if (target == pwd->hwndTarget) {
+            propHandle = ENABLE_RIGHTBOTTOM;
+        }
+        else {
+            propHandle = ENABLE_ALL;
+        }
+
+        // TODO: in region of interest, iterate over 8 squares, skip center and disabled ones
+        // OffsetRect
+        for (int y = rcInflate.top; y <= rcInflate.bottom; y += step_y) {
+            for (int x = rcInflate.left; x <= rcInflate.right; x += step_x) {
+                // skip center
+                if (x == rcInflate.left + step_x && y == rcInflate.top + step_y) {
+                    continue;
+                }
+
+                // skip disabled handles
+                if (~propHandle & 1) {
+                    continue;
+                }
+
+                SetRect(&rcSquare, x, y, x + dd, y + dd);
+                if (PtInRect(&rcSquare, pt)) {
+                    return TRUE;
+                }
+
+                propHandle >>= 1;
+            }
+        }
+    }
+
+    return FALSE;
+}
+
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
                      _In_ LPWSTR    lpCmdLine,
