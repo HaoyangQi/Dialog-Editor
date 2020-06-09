@@ -1,6 +1,6 @@
 #include "windowlist.h"
 
-WINDOW_LIST* NewWindowList(HWND hwndBase, BOOL isVisible)
+WINDOW_LIST* CreateWindowList()
 {
 	WINDOW_LIST* pList = (WINDOW_LIST*)malloc(sizeof(WINDOW_LIST));
 
@@ -9,62 +9,52 @@ WINDOW_LIST* NewWindowList(HWND hwndBase, BOOL isVisible)
 	}
 
 	memset(pList, 0, sizeof(WINDOW_LIST));
-	pList->bVisible = isVisible;
-
-	if (hwndBase) {
-		pList->base = AddWindow(pList, hwndBase, LOCK_TOPLEFT);
-		if (!pList->base) {
-			ReleaseWindowList(pList);
-			return NULL;
-		}
-	}
-
 	return pList;
 }
 
 void ReleaseWindowList(WINDOW_LIST* pList)
 {
 	if (pList) {
-		WINDOW_GEOMETRY* pCurrent = pList->begin;
-		WINDOW_GEOMETRY* pTmp;
+		WINDOW_ITEM* pCurrent = pList->begin;
+		WINDOW_ITEM* pTmp;
 
 		while (pCurrent) {
 			pTmp = pCurrent->next;
 			free(pCurrent);
 			pCurrent = pTmp;
 		}
+
+		free(pList);
 	}
 }
 
-WINDOW_GEOMETRY* AddWindow(WINDOW_LIST* pList, HWND hwnd, LONG disableHandles)
+WINDOW_ITEM* AddWindow(WINDOW_LIST* pList, HWND hwnd, LONG handleProperty)
 {
-	WINDOW_GEOMETRY* pwe = (WINDOW_GEOMETRY*)malloc(sizeof(WINDOW_GEOMETRY));
+	WINDOW_ITEM* pwi = (WINDOW_ITEM*)malloc(sizeof(WINDOW_ITEM));
 
-	if (!pwe) {
+	if (!pwi) {
 		return NULL;
 	}
 
-	memset(pwe, 0, sizeof(WINDOW_GEOMETRY));
-	pwe->disable = disableHandles;
-	pwe->hwnd = hwnd;
-	GetWindowRect(hwnd, &(pwe->rect));
+	memset(pwi, 0, sizeof(WINDOW_ITEM));
+	pwi->hwnd = hwnd;
+	pwi->handle_property = handleProperty;
+	pwi->next = pList->begin;
 
-	pwe->prev = NULL;
-	pwe->next = pList->begin;
-	pList->begin = pwe;
+	pList->begin = pwi;
 	if (pList->end == NULL) {
-		pList->end = pwe;
+		pList->end = pwi;
 	}
 
-	return pwe;
+	return pwi;
 }
 
 void DeleteWindow(WINDOW_LIST* pList, HWND hwnd)
 {
-	DeleteWindowByReference(pList, WindowListFind(pList, hwnd));
+	DeleteWindowItem(pList, WindowListFind(pList, hwnd));
 }
 
-void DeleteWindowByReference(WINDOW_LIST* pList, WINDOW_GEOMETRY* pwe)
+void DeleteWindowItem(WINDOW_LIST* pList, WINDOW_ITEM* pwe)
 {
 	if (pwe) {
 		if (pwe->prev) {
@@ -81,13 +71,14 @@ void DeleteWindowByReference(WINDOW_LIST* pList, WINDOW_GEOMETRY* pwe)
 			pList->end = pwe->prev;
 		}
 
+		DestroyWindow(pwe->hwnd);
 		free(pwe);
 	}
 }
 
-WINDOW_GEOMETRY* WindowListFind(const WINDOW_LIST* pList, const HWND hwnd)
+WINDOW_ITEM* WindowListFind(const WINDOW_LIST* pList, const HWND hwnd)
 {
-	WINDOW_GEOMETRY* pwe = pList->begin;
+	WINDOW_ITEM* pwe = pList->begin;
 
 	while (pwe) {
 		if (pwe->hwnd == hwnd) {
@@ -99,25 +90,8 @@ WINDOW_GEOMETRY* WindowListFind(const WINDOW_LIST* pList, const HWND hwnd)
 	return NULL;
 }
 
-WINDOW_GEOMETRY* WindowListHitTest(const WINDOW_LIST* pList, const POINT pt)
-{
-	WINDOW_GEOMETRY* pwe = pList->begin;
+// ----------------------------------------------------------------------------------
+// Selection List
 
-	while (pwe) {
-		if (PtInRect(&(pwe->rect), pt)) {
-			return pwe;
-		}
-		pwe = pwe->next;
-	}
 
-	return NULL;
-}
 
-void WindowListUpdateWindowPosition(WINDOW_GEOMETRY* window, int delta_x, int delta_y)
-{
-	MapWindowPoints(HWND_DESKTOP, GetParent(window->hwnd), (LPPOINT)(&(window->rect)), 2);
-	MoveWindow(window->hwnd,
-		window->rect.left + delta_x, window->rect.top + delta_y,
-		window->rect.right - window->rect.left, window->rect.bottom - window->rect.top, TRUE);
-	GetWindowRect(window->hwnd, &(window->rect));
-}

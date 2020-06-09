@@ -2,6 +2,7 @@
 
 #include "resource.h"
 #include <windowsx.h>
+#include "windowlist.h"
 
 #define HANDLE_TOP_LEFT      0x01
 #define HANDLE_TOP_CENTER    0x02
@@ -43,4 +44,8 @@ typedef struct {
 	// Track rectangle: 
 	POINT ptTrackStart;
 	RECT rcTrackPrev;
+
+	// Controls and Selection
+	WINDOW_LIST* listDialogControls;
+	SELECTION_LIST* listSelection;
 } WINDOW_DESIGNER;
