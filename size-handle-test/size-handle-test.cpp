@@ -13,8 +13,7 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 WCHAR szTargetLayerClass[MAX_LOADSTRING] = L"TargetWindowTest";
 WCHAR szTargetTitle[MAX_LOADSTRING] = L"Target Test Window";
 
-//BOOL bVisible = TRUE;
-
+HWND focus = NULL;
 WINDOW_DESIGNER designerData;
 
 // Forward declarations of functions included in this code module:
@@ -99,18 +98,23 @@ BOOL DrawHandle(WINDOW_DESIGNER* pwd, HDC hdc, int x, int y, BOOL bEnable)
     return ret;
 }
 
-BOOL DrawWindowHandles(WINDOW_DESIGNER* pwd, HDC hdc, HWND target, int dd, LONG flagEnableHandles)
+BOOL DrawWindowHandles(WINDOW_DESIGNER* pwd, HWND target, int dd, LONG flagEnableHandles)
 {
     BOOL ret = TRUE;
     RECT rcTarget;
     LONG width, height, step_x, step_y;
+    HDC hdc;
 
-    if (!IsChild(pwd->hwndMain, target)) {
+    if (!target) {
         return FALSE;
     }
 
+    /*if (!IsChild(parent, target)) {
+        return FALSE;
+    }*/
+
     GetWindowRect(target, &rcTarget);
-    MapWindowPoints(HWND_DESKTOP, pwd->hwndMain, (LPPOINT)&rcTarget, 2);
+    MapWindowPoints(HWND_DESKTOP, designerData.hwndMain, (LPPOINT)&rcTarget, 2);
     InflateRect(&rcTarget, dd, dd);
 
     width = rcTarget.right - rcTarget.left;
@@ -118,17 +122,28 @@ BOOL DrawWindowHandles(WINDOW_DESIGNER* pwd, HDC hdc, HWND target, int dd, LONG 
     step_x = (width - dd) / 2;
     step_y = (height - dd) / 2;
 
-    for (int y = rcTarget.top, index = 0; y <= height; y += step_y) {
-        for (int x = rcTarget.left; x <= width; x += step_x) {
+    hdc = GetDC(designerData.hwndMain);
+
+    if (!hdc) {
+        OutputDebugString(L"Error: DC not available\n");
+        return FALSE;
+    }
+
+    for (int y = rcTarget.top; y <= rcTarget.bottom; y += step_y) {
+        for (int x = rcTarget.left; x <= rcTarget.right; x += step_x) {
             // skip center
             if (x == rcTarget.left + step_x && y == rcTarget.top + step_y) {
                 continue;
             }
 
+            // TODO: fix x, y for a percise bound?
+
             ret &= DrawHandle(pwd, hdc, x, y, flagEnableHandles & 1);
             flagEnableHandles >>= 1;
         }
     }
+
+    ReleaseDC(designerData.hwndMain, hdc);
 
     return ret;
 }
@@ -232,8 +247,19 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		return FALSE;
 	}
 
+    focus = designerData.hwndTarget;
+
 	ShowWindow(designerData.hwndTarget, nCmdShow);
 	UpdateWindow(designerData.hwndTarget);
+
+    CreateWindow(L"BUTTON", L"Test 1", WS_VISIBLE | WS_CHILD,
+        0, 0, 100, 20, designerData.hwndTarget, NULL, hInst, nullptr);
+    CreateWindow(L"BUTTON", L"Test 2", WS_VISIBLE | WS_CHILD,
+        0, 20, 100, 20, designerData.hwndTarget, NULL, hInst, nullptr);
+    CreateWindow(L"BUTTON", L"Test 3", WS_VISIBLE | WS_CHILD,
+        0, 40, 100, 20, designerData.hwndTarget, NULL, hInst, nullptr);
+    CreateWindow(L"EDIT", L"Test 4", WS_VISIBLE | WS_CHILD,
+        20, 80, 100, 20, designerData.hwndTarget, NULL, hInst, nullptr);
 
 	// Force refresh everything
 	UpdateWindow(designerData.hwndMain);
@@ -281,12 +307,27 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             designerData.ptTrackStart.y = y;
             SetRect(&designerData.rcTrackPrev, x, y, x, y);
 
-            InvalidateRect(hWnd, NULL, TRUE);
-
             // TODO: SetCapture
 
-            // TODO: ChildWindowFromPoint: test which control is hit
-            // it does not test grandchild, so need to test over both windows
+            // TODO: hit test routinue
+            POINT pt;
+            pt.x = x;
+            pt.y = y;
+            HWND hit = ChildWindowFromPoint(hWnd, pt);
+            if (hit != NULL && hit != hWnd) {
+                focus = hit;
+                MapWindowPoints(hWnd, designerData.hwndTarget, &pt, 1);
+                hit = ChildWindowFromPoint(designerData.hwndTarget, pt);
+                if (hit != NULL && hit != designerData.hwndTarget) {
+                    focus = hit;
+                }
+            }
+            else {
+                // reset focus
+                focus = designerData.hwndTarget;
+            }
+
+            InvalidateRect(hWnd, NULL, TRUE);
 
             break;
         }
@@ -325,14 +366,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 ReleaseDC(hWnd, hdc);
             }
 
-            POINT pt;
+            /*POINT pt;
             GetCursorPos(&pt);
             LRESULT ret = DefWindowProc(designerData.hwndTarget, WM_NCHITTEST, 0, MAKELPARAM(pt.x, pt.y));
             if (ret != HTNOWHERE) {
                 wchar_t buf[100] = L"\0";
                 swprintf_s(buf, 100, L"hit %lld\n", ret);
                 OutputDebugString(buf);
-            }
+            }*/
 
             break;
         }
@@ -352,20 +393,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         case WM_PAINT:
         {
-            OutputDebugString(L"Parent Paint\n");
+            //OutputDebugString(L"Parent Paint\n");
             PAINTSTRUCT ps;
-            HDC hdc;
+            //HDC hdc;
+
+            // focus test
+            LONG enable = focus == designerData.hwndTarget ? ENABLE_RIGHTBOTTOM : ENABLE_ALL;
             
             BeginPaint(hWnd, &ps);
-            if (designerData.bVisible) {
-                hdc = GetDC(hWnd);
-                DrawWindowHandles(&designerData, hdc, designerData.hwndTarget, 6, ENABLE_RIGHTBOTTOM);
-                ReleaseDC(hWnd, hdc);
-            }
             EndPaint(hWnd, &ps);
 
+            /*if (designerData.bVisible) {
+                DrawWindowHandles(&designerData, hWnd, focus, 6, ENABLE_RIGHTBOTTOM);
+            }*/
+
             // fall-through the re-paint
-            RedrawWindow(designerData.hwndTarget, NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN);
+            RedrawWindow(designerData.hwndTarget, NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW);
+
+            if (designerData.bVisible) {
+                DrawWindowHandles(&designerData, focus, 6, enable);
+            }
 
             break;
         }
@@ -381,16 +428,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 LRESULT CALLBACK TargetProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    static HWND btn;
-
     switch (message)
     {
-    case WM_CREATE:
-    {
-        btn = CreateWindow(L"BUTTON", L"Test", WS_VISIBLE | WS_CHILD,
-            20, 10, 100, 20, hWnd, NULL, hInst, nullptr);
-        break;
-    }
     case WM_COMMAND:
     {
         int wmId = LOWORD(wParam);
@@ -408,10 +447,12 @@ LRESULT CALLBACK TargetProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         PAINTSTRUCT ps;
         HDC hdc;
 
-        hdc = BeginPaint(hWnd, &ps);
+        BeginPaint(hWnd, &ps);
         EndPaint(hWnd, &ps);
 
-        //InvalidateRect(btn, NULL, TRUE);
+        if (designerData.bVisible) {
+            DrawWindowHandles(&designerData, designerData.hwndMain, focus, 6, ENABLE_ALL);
+        }
     }*/
     break;
     case WM_DESTROY:
