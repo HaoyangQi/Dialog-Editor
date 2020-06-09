@@ -114,7 +114,7 @@ BOOL DrawWindowHandles(WINDOW_DESIGNER* pwd, HWND target, int dd, LONG flagEnabl
     }*/
 
     GetWindowRect(target, &rcTarget);
-    MapWindowPoints(HWND_DESKTOP, designerData.hwndMain, (LPPOINT)&rcTarget, 2);
+    MapWindowPoints(HWND_DESKTOP, pwd->hwndMain, (LPPOINT)&rcTarget, 2);
     InflateRect(&rcTarget, dd, dd);
 
     width = rcTarget.right - rcTarget.left;
@@ -122,7 +122,7 @@ BOOL DrawWindowHandles(WINDOW_DESIGNER* pwd, HWND target, int dd, LONG flagEnabl
     step_x = (width - dd) / 2;
     step_y = (height - dd) / 2;
 
-    hdc = GetDC(designerData.hwndMain);
+    hdc = GetDC(pwd->hwndMain);
 
     if (!hdc) {
         OutputDebugString(L"Error: DC not available\n");
@@ -143,7 +143,7 @@ BOOL DrawWindowHandles(WINDOW_DESIGNER* pwd, HWND target, int dd, LONG flagEnabl
         }
     }
 
-    ReleaseDC(designerData.hwndMain, hdc);
+    ReleaseDC(pwd->hwndMain, hdc);
 
     return ret;
 }
@@ -302,7 +302,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             LONG x = GET_X_LPARAM(lParam);
             LONG y = GET_Y_LPARAM(lParam);
 
-            designerData.bVisible = FALSE;
+            // keep designerData.bVisible to TRUE for better transition update
             designerData.ptTrackStart.x = x;
             designerData.ptTrackStart.y = y;
             SetRect(&designerData.rcTrackPrev, x, y, x, y);
@@ -327,7 +327,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 focus = designerData.hwndTarget;
             }
 
-            InvalidateRect(hWnd, NULL, TRUE);
+            // immediate update 1 frame to show focus change (pre-drag)
+            RedrawWindow(hWnd, NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW | RDW_ERASE);
 
             break;
         }
@@ -348,6 +349,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             // => black part no effect, white part will invert the color
             // => when another move come, use original mem XOR with DC again, then update mem
             if (wParam & MK_LBUTTON) {
+                // check the guard: pre-drag: LB pressed
+                if (designerData.bVisible) {
+                    designerData.bVisible = FALSE;
+                    // immediate refresh 1 frame to purge any existing handles
+                    RedrawWindow(hWnd, NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW | RDW_ERASE);
+                }
+
                 LONG x = GET_X_LPARAM(lParam);
                 LONG y = GET_Y_LPARAM(lParam);
                 LONG trackW = abs(designerData.ptTrackStart.x - x);
@@ -365,15 +373,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
                 ReleaseDC(hWnd, hdc);
             }
-
-            /*POINT pt;
-            GetCursorPos(&pt);
-            LRESULT ret = DefWindowProc(designerData.hwndTarget, WM_NCHITTEST, 0, MAKELPARAM(pt.x, pt.y));
-            if (ret != HTNOWHERE) {
-                wchar_t buf[100] = L"\0";
-                swprintf_s(buf, 100, L"hit %lld\n", ret);
-                OutputDebugString(buf);
-            }*/
 
             break;
         }
@@ -393,7 +392,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         case WM_PAINT:
         {
-            //OutputDebugString(L"Parent Paint\n");
+            OutputDebugString(L"Parent Paint\n");
             PAINTSTRUCT ps;
             //HDC hdc;
 
