@@ -27,6 +27,10 @@ typedef struct {
 	HWND hwndMain;
 	HWND hwndTarget;
 
+	// DPI: WinAPI considers 96 DPI input
+	float dpiScaleX;
+	float dpiScaleY;
+
 	// Image resources
 	HBITMAP bmpHandleEnable;
 	HBITMAP bmpHandleDisable;
@@ -40,6 +44,9 @@ typedef struct {
 	LONG imgWidth;
 	LONG imgHeight;
 	BOOL bVisible;
+
+	// margin
+	RECT rcMargin;
 
 	// Mouse Track & Capture
 	POINT ptTrackStart;

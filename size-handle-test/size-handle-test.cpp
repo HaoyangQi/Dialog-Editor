@@ -13,6 +13,7 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 WCHAR szTargetLayerClass[MAX_LOADSTRING] = L"TargetWindowTest";
 WCHAR szTargetTitle[MAX_LOADSTRING] = L"Target Test Window";
 
+HWND btnMain = NULL;
 HWND focus = NULL;
 WINDOW_DESIGNER designerData;
 
@@ -36,7 +37,19 @@ void debugCheckError(int pos) {
 void InitWindowDesigner(WINDOW_DESIGNER* pwd)
 {
     BITMAP image;
-    //HDC hdc;
+    HDC hdc;
+
+    // fill DPI scale factor
+    hdc = GetDC(NULL);
+    if (hdc) {
+        pwd->dpiScaleX = GetDeviceCaps(hdc, LOGPIXELSX) / 96.0f;
+        pwd->dpiScaleY = GetDeviceCaps(hdc, LOGPIXELSY) / 96.0f;
+    }
+    else {
+        pwd->dpiScaleX = 1.0f;
+        pwd->dpiScaleY = 1.0f;
+    }
+    ReleaseDC(NULL, hdc);
 
     pwd->hwndMain = NULL;
     pwd->hwndTarget = NULL;
@@ -146,6 +159,14 @@ BOOL DrawWindowHandles(WINDOW_DESIGNER* pwd, HWND target, int dd, LONG flagEnabl
     ReleaseDC(pwd->hwndMain, hdc);
 
     return ret;
+}
+
+BOOL IsSubRect(const RECT* target, const RECT* bound)
+{
+    return target->left >= bound->left &&
+        target->top >= bound->top &&
+        target->right <= bound->right &&
+        target->bottom <= bound->bottom;
 }
 
 // point in base window coordinates
@@ -283,8 +304,21 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 	InitWindowDesigner(&designerData);
 
-	designerData.hwndMain = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW/*WS_CHILDWINDOW | WS_VISIBLE | WS_CLIPSIBLINGS*/,
-		50, 50, 700, 400, nullptr, nullptr, hInstance, nullptr);
+    // debug-only settings
+    LONG tmpMainWidth = 700 * designerData.dpiScaleX;
+    LONG tmpMainHeight = 400 * designerData.dpiScaleY;
+    LONG tmpTargetWidth = 300 * designerData.dpiScaleX;
+    LONG tmpTargetHeight = 250 * designerData.dpiScaleY;
+    LONG tmpControlWidth = 100 * designerData.dpiScaleX;
+    LONG tmpControlHeight = 20 * designerData.dpiScaleY;
+    // --------------------
+
+	designerData.hwndMain = CreateWindowW(szWindowClass, szTitle, 
+        WS_OVERLAPPEDWINDOW/*WS_CHILDWINDOW | WS_VISIBLE | WS_CLIPSIBLINGS*/,
+		50, 50, 
+        tmpMainWidth,
+        tmpMainHeight,
+        nullptr, nullptr, hInstance, nullptr);
 
 	if (!designerData.hwndMain)
 	{
@@ -296,26 +330,41 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 	designerData.hwndTarget = CreateWindowEx(0, szTargetLayerClass, szTargetTitle,
 		WS_CAPTION | WS_CHILDWINDOW | WS_VISIBLE | WS_DISABLED | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_SYSMENU,
-		7, 7, 300, 250, designerData.hwndMain, NULL, hInst, NULL);
+		7, 7, 
+        tmpTargetWidth,
+        tmpTargetHeight,
+        designerData.hwndMain, NULL, hInst, NULL);
 
 	if (!designerData.hwndTarget)
 	{
 		return FALSE;
 	}
 
+    // set default margin box
+    GetClientRect(designerData.hwndTarget, &designerData.rcMargin);
+    InflateRect(&designerData.rcMargin, -7, -7);
+
     focus = designerData.hwndTarget;
 
 	ShowWindow(designerData.hwndTarget, nCmdShow);
 	UpdateWindow(designerData.hwndTarget);
 
+    // debug test controls
+    btnMain = CreateWindow(L"BUTTON", L"Test", WS_VISIBLE | WS_CHILD,
+        tmpTargetWidth + 20, 10, tmpControlWidth, tmpControlHeight, 
+        designerData.hwndMain, NULL, hInst, nullptr);
     CreateWindow(L"BUTTON", L"Test 1", WS_VISIBLE | WS_CHILD,
-        0, 0, 100, 20, designerData.hwndTarget, NULL, hInst, nullptr);
+        7, 7, tmpControlWidth, tmpControlHeight, 
+        designerData.hwndTarget, NULL, hInst, nullptr);
     CreateWindow(L"BUTTON", L"Test 2", WS_VISIBLE | WS_CHILD,
-        0, 20, 100, 20, designerData.hwndTarget, NULL, hInst, nullptr);
+        7, tmpControlHeight + 7, tmpControlWidth, tmpControlHeight, 
+        designerData.hwndTarget, NULL, hInst, nullptr);
     CreateWindow(L"BUTTON", L"Test 3", WS_VISIBLE | WS_CHILD,
-        0, 40, 100, 20, designerData.hwndTarget, NULL, hInst, nullptr);
+        7, tmpControlHeight * 2 + 7, tmpControlWidth, tmpControlHeight,
+        designerData.hwndTarget, NULL, hInst, nullptr);
     CreateWindow(L"EDIT", L"Test 4", WS_VISIBLE | WS_CHILD,
-        20, 80, 100, 20, designerData.hwndTarget, NULL, hInst, nullptr);
+        20, tmpControlHeight * 4 + 7, tmpControlWidth, tmpControlHeight,
+        designerData.hwndTarget, NULL, hInst, nullptr);
 
 	// Force refresh everything
 	UpdateWindow(designerData.hwndMain);
@@ -328,12 +377,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
-        case WM_CREATE:
-        {
-            CreateWindow(L"BUTTON", L"Test", WS_VISIBLE | WS_CHILD,
-                310, 10, 100, 20, hWnd, (HMENU)1000, hInst, nullptr);
-            break;
-        }
         case WM_COMMAND:
         {
             int wmId = LOWORD(wParam);
@@ -363,8 +406,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             designerData.ptTrackStart.y = y;
             SetRect(&designerData.rcTrackPrev, x, y, x, y);
 
-            // TODO: SetCapture
-
             // TODO: hit test routinue
             POINT pt;
             pt.x = x;
@@ -393,6 +434,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             break;
         }
+        case WM_LBUTTONUP:
+        {
+            designerData.bVisible = TRUE;
+            if (focus != designerData.hwndTarget) {
+                MapWindowPoints(hWnd, designerData.hwndTarget, (LPPOINT)&designerData.rcSelectionBB, 2);
+                MoveWindow(focus,
+                    designerData.rcSelectionBB.left, designerData.rcSelectionBB.top,
+                    designerData.rcSelectionBB.right - designerData.rcSelectionBB.left,
+                    designerData.rcSelectionBB.bottom - designerData.rcSelectionBB.top,
+                    FALSE);
+            }
+            InvalidateRect(hWnd, NULL, TRUE);
+            break;
+        }
         case WM_MOUSEMOVE:
         {
             // TODO: Mouse Drag:
@@ -404,16 +459,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             // => black part no effect, white part will invert the color
             // => when another move come, use original mem XOR with DC again, then update mem
             if (wParam & MK_LBUTTON) {
+                LONG x = GET_X_LPARAM(lParam);
+                LONG y = GET_Y_LPARAM(lParam);
+                HDC hdc;
+
                 // check the guard: pre-drag: LB pressed
                 if (designerData.bVisible) {
                     designerData.bVisible = FALSE;
                     // immediate refresh 1 frame to purge any existing handles
                     RedrawWindow(hWnd, NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW | RDW_ERASE);
                 }
-
-                LONG x = GET_X_LPARAM(lParam);
-                LONG y = GET_Y_LPARAM(lParam);
-
+                
                 if (focus == designerData.hwndTarget) {
                     // if not hitting a control, show selection track rectangle
                     LONG trackW = abs(designerData.ptTrackStart.x - x);
@@ -422,7 +478,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     x = min(designerData.ptTrackStart.x, x);
                     y = min(designerData.ptTrackStart.y, y);
 
-                    HDC hdc = GetDC(hWnd);
+                    hdc = GetDC(hWnd);
 
                     // DrawFocusRect is XOR, re-apply on same rect twice will erase it (no effect)
                     DrawFocusRect(hdc, &designerData.rcTrackPrev);
@@ -436,33 +492,64 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     LONG dx = x - designerData.ptTrackStart.x;
                     LONG dy = y - designerData.ptTrackStart.y;
 
-                    HDC hdc = GetDC(hWnd);
+                    hdc = GetDC(hWnd);
 
-                    DrawFocusRect(hdc, &designerData.rcSelectionBB);
+                    // TODO: bounding test: add more data member to avoid API calls
+                    /* Method 1: strict check */
+                    /*DrawFocusRect(hdc, &designerData.rcSelectionBB); // clear previous
+                    RECT rcTmpBound;
+                    BOOL isInside;
+                    CopyRect(&rcTmpBound, &designerData.rcMargin);
+                    MapWindowPoints(designerData.hwndTarget, hWnd, (LPPOINT)&rcTmpBound, 2);
+                    // start simulating
                     OffsetRect(&designerData.rcSelectionBB, dx, dy);
+                    isInside = IsSubRect(&designerData.rcSelectionBB, &rcTmpBound);
+                    if (!isInside) {
+                        OffsetRect(&designerData.rcSelectionBB, -dx, -dy);
+                        // cursor is moving too far, stop updating trackStart to wait for it
+                        // to come back
+                    }
+                    else {
+                        designerData.ptTrackStart.x = x;
+                        designerData.ptTrackStart.y = y;
+                    }
+                    EnableWindow(btnMain, isInside); // test
+                    DrawFocusRect(hdc, &designerData.rcSelectionBB);*/
+                    /* Methos 2: Seperate check */
+                    DrawFocusRect(hdc, &designerData.rcSelectionBB); // clear previous
+                    RECT rcTmpBound;
+                    BOOL isInsideX, isInsideY;
+                    CopyRect(&rcTmpBound, &designerData.rcMargin);
+                    MapWindowPoints(designerData.hwndTarget, hWnd, (LPPOINT)&rcTmpBound, 2);
+                    // start simulating X
+                    OffsetRect(&designerData.rcSelectionBB, dx, 0);
+                    isInsideX = IsSubRect(&designerData.rcSelectionBB, &rcTmpBound);
+                    if (!isInsideX) {
+                        OffsetRect(&designerData.rcSelectionBB, -dx, 0);
+                        // cursor is moving too far, stop updating trackStart to wait for it
+                        // to come back
+                    }
+                    else {
+                        designerData.ptTrackStart.x = x;
+                    }
+                    // start simulating Y
+                    OffsetRect(&designerData.rcSelectionBB, 0, dy);
+                    isInsideY = IsSubRect(&designerData.rcSelectionBB, &rcTmpBound);
+                    if (!isInsideY) {
+                        OffsetRect(&designerData.rcSelectionBB, 0, -dy);
+                        // cursor is moving too far, stop updating trackStart to wait for it
+                        // to come back
+                    }
+                    else {
+                        designerData.ptTrackStart.y = y;
+                    }
                     DrawFocusRect(hdc, &designerData.rcSelectionBB);
+                    EnableWindow(btnMain, isInsideX || isInsideY); // test
 
                     ReleaseDC(hWnd, hdc);
-
-                    designerData.ptTrackStart.x = x;
-                    designerData.ptTrackStart.y = y;
                 }
             }
 
-            break;
-        }
-        case WM_LBUTTONUP:
-        {
-            designerData.bVisible = TRUE;
-            if (focus != designerData.hwndTarget) {
-                MapWindowPoints(hWnd, designerData.hwndTarget, (LPPOINT)&designerData.rcSelectionBB, 2);
-                MoveWindow(focus,
-                    designerData.rcSelectionBB.left, designerData.rcSelectionBB.top,
-                    designerData.rcSelectionBB.right - designerData.rcSelectionBB.left,
-                    designerData.rcSelectionBB.bottom - designerData.rcSelectionBB.top,
-                    FALSE);
-            }
-            InvalidateRect(hWnd, NULL, TRUE);
             break;
         }
         case WM_SIZING:
@@ -481,7 +568,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         case WM_PAINT:
         {
-            OutputDebugString(L"Parent Paint\n");
+            //OutputDebugString(L"Parent Paint\n");
             PAINTSTRUCT ps;
             //HDC hdc;
 
@@ -529,20 +616,24 @@ LRESULT CALLBACK TargetProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         }
     }
     break;
-    /*case WM_PAINT:
+    case WM_PAINT:
     {
-        OutputDebugString(L"Target Paint\n");
+        //OutputDebugString(L"Target Paint\n");
         PAINTSTRUCT ps;
         HDC hdc;
+        HBRUSH brFrame;
+        //RECT rect;
 
-        BeginPaint(hWnd, &ps);
+        hdc = BeginPaint(hWnd, &ps);
+        brFrame = CreateSolidBrush(RGB(0, 0, 255));
+
+        // TODO: margin rect test
+        FrameRect(hdc, &designerData.rcMargin, brFrame);
+
+        DeleteObject(brFrame);
         EndPaint(hWnd, &ps);
-
-        if (designerData.bVisible) {
-            DrawWindowHandles(&designerData, designerData.hwndMain, focus, 6, ENABLE_ALL);
-        }
-    }*/
-    break;
+        break;
+    }
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
