@@ -61,4 +61,21 @@
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="move.cur">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="scale-horizontal.cur">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="scale-ne.cur">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="scale-se.cur">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="scale-vertical.cur">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
 </Project>

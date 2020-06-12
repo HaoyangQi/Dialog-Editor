@@ -27,6 +27,15 @@ typedef struct {
 	HWND hwndMain;
 	HWND hwndTarget;
 
+	// Cursor
+	HCURSOR curCurrent;
+	HCURSOR curDefault;
+	HCURSOR curMove;
+	HCURSOR curLR;
+	HCURSOR curUD;
+	HCURSOR curNE;
+	HCURSOR curSE;
+
 	// DPI: WinAPI considers 96 DPI input
 	float dpiScaleX;
 	float dpiScaleY;
@@ -45,7 +54,7 @@ typedef struct {
 	LONG imgHeight;
 	BOOL bVisible;
 
-	// margin
+	// Margin Box
 	RECT rcMargin;
 
 	// Mouse Track & Capture

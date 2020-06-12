@@ -166,6 +166,13 @@
     <Image Include="size-handle-test.ico" />
     <Image Include="small.ico" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="move.cur" />
+    <None Include="scale-horizontal.cur" />
+    <None Include="scale-ne.cur" />
+    <None Include="scale-se.cur" />
+    <None Include="scale-vertical.cur" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

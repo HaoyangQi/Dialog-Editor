@@ -62,6 +62,13 @@ void InitWindowDesigner(WINDOW_DESIGNER* pwd)
 
     pwd->bmpHandleEnable = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_HANDLE_ENABLE));
     pwd->bmpHandleDisable = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_HANDLE_DISABLE));
+    pwd->curDefault = LoadCursor(NULL, IDC_ARROW);
+    pwd->curMove = LoadCursor(hInst, MAKEINTRESOURCE(IDC_MOVE));
+    pwd->curLR = LoadCursor(hInst, MAKEINTRESOURCE(IDC_RESIZE_H));
+    pwd->curUD = LoadCursor(hInst, MAKEINTRESOURCE(IDC_RESIZE_V));
+    pwd->curNE = LoadCursor(hInst, MAKEINTRESOURCE(IDC_RESIZE_NE));
+    pwd->curSE = LoadCursor(hInst, MAKEINTRESOURCE(IDC_RESIZE_SE));
+    pwd->curCurrent = pwd->curDefault;
 
     // Fetch image dimension
     GetObject(pwd->bmpHandleEnable, sizeof(BITMAP), &image);
@@ -78,6 +85,14 @@ void InitWindowDesigner(WINDOW_DESIGNER* pwd)
 
 void ReleaseWindowDesigner(WINDOW_DESIGNER* pwd)
 {
+    // destroy cursors
+    DestroyCursor(pwd->curDefault);
+    DestroyCursor(pwd->curMove);
+    DestroyCursor(pwd->curLR);
+    DestroyCursor(pwd->curUD);
+    DestroyCursor(pwd->curNE);
+    DestroyCursor(pwd->curSE);
+
     // detach objects
     SelectObject(pwd->hdcHandleDisable, pwd->oldHandleDisable);
     SelectObject(pwd->hdcHandleEnable, pwd->oldHandleEnable);
@@ -278,7 +293,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.cbWndExtra     = 0;
     wcex.hInstance      = hInstance;
     wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_SIZEHANDLETEST));
-    wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
+    wcex.hCursor        = NULL;
     wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW + 1);
     wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_SIZEHANDLETEST);
     wcex.lpszClassName  = szWindowClass;
@@ -391,6 +406,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
+        case WM_CREATE:
+        {
+            SetCursor(designerData.curCurrent);
+            break;
+        }
         case WM_COMMAND:
         {
             int wmId = LOWORD(wParam);
@@ -568,6 +588,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 // simple moving
                 POINT cur;
                 LONG hit_handle;
+                HCURSOR curNext;
 
                 cur.x = x;
                 cur.y = y;
@@ -576,6 +597,36 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 wchar_t buf[5] = L"\0";
                 swprintf_s(buf, 5, L"%d", hit_handle);
                 SetWindowText(staticMain, buf);
+
+                switch (hit_handle) {
+                    case 0:
+                        curNext = focus == designerData.hwndTarget ? designerData.curDefault : designerData.curMove;
+                        break;
+                    case HANDLE_TOP_LEFT:
+                    case HANDLE_BOTTOM_RIGHT:
+                        curNext = designerData.curSE;
+                        break;
+                    case HANDLE_TOP_CENTER:
+                    case HANDLE_BOTTOM_CENTER:
+                        curNext = designerData.curUD;
+                        break;
+                    case HANDLE_TOP_RIGHT:
+                    case HANDLE_BOTTOM_LEFT:
+                        curNext = designerData.curNE;
+                        break;
+                    case HANDLE_MIDDLE_LEFT:
+                    case HANDLE_MIDDLE_RIGHT:
+                        curNext = designerData.curLR;
+                        break;
+                    default:
+                        curNext = designerData.curDefault;
+                        break;
+                }
+
+                if (curNext != designerData.curCurrent) {
+                    SetCursor(curNext);
+                    designerData.curCurrent = curNext;
+                }
             }
 
             break;
