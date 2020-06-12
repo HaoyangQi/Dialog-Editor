@@ -14,6 +14,7 @@ WCHAR szTargetLayerClass[MAX_LOADSTRING] = L"TargetWindowTest";
 WCHAR szTargetTitle[MAX_LOADSTRING] = L"Target Test Window";
 
 HWND btnMain = NULL;
+HWND staticMain, staticMainFocus, staticMainCur;
 HWND focus = NULL;
 WINDOW_DESIGNER designerData;
 
@@ -170,34 +171,40 @@ BOOL IsSubRect(const RECT* target, const RECT* bound)
 }
 
 // point in base window coordinates
-BOOL IsHoveringOnHandles(WINDOW_DESIGNER* pwd, HWND target, int dd, POINT pt)
+// -1 nowhere, 0 inside, otherwise a handle
+LONG IsHoveringOnHandles(WINDOW_DESIGNER* pwd, POINT pt, int dd)
 {
-    RECT rcWindow, rcInflate, rcSquare;
-    LONG propHandle;
+    RECT rcInflate, rcSquare, rcTmp;
+    LONG handle = HANDLE_TOP_LEFT;// , config = ENABLE_ALL;
     LONG width, height, step_x, step_y;
 
-    // TODO: make get rect part outside, in LB down msg
-    if (!GetWindowRect(target, &rcInflate)) {
-        return FALSE;
+    // TODO: rcTmp is only used to test, actually the focus rect
+    GetWindowRect(focus, &rcTmp);
+    MapWindowPoints(HWND_DESKTOP, pwd->hwndMain, (LPPOINT)&rcTmp, 2);
+
+    if (PtInRect(&rcTmp, pt)) {
+        return 0;
     }
-    
-    MapWindowPoints(HWND_DESKTOP, pwd->hwndMain, (LPPOINT)&rcInflate, 2);
-    CopyRect(&rcWindow, &rcInflate);
-    InflateRect(&rcInflate, dd, dd);
+
+    CopyRect(&rcInflate, &rcTmp);
+    InflateRect(&rcInflate, 6, 6);
 
     width = rcInflate.right - rcInflate.left;
     height = rcInflate.bottom - rcInflate.top;
     step_x = (width - dd) / 2;
     step_y = (height - dd) / 2;
 
-    if (PtInRect(&rcInflate, pt) && !PtInRect(&rcWindow, pt)) {
-        if (target == pwd->hwndTarget) {
-            propHandle = ENABLE_RIGHTBOTTOM;
-        }
-        else {
-            propHandle = ENABLE_ALL;
-        }
+    wchar_t b1[100] = L"\0", b2[100] = L"\0";
+    swprintf_s(b1, 100, L"(%d, %d) - (%d, %d)", rcInflate.left, rcInflate.top, rcInflate.right, rcInflate.bottom);
+    swprintf_s(b2, 100, L"(%d, %d)", pt.x, pt.y);
+    SetWindowText(staticMainFocus, b1);
+    SetWindowText(staticMainCur, b2);
 
+    /*if (target == pwd->hwndTarget) {
+        config = ENABLE_RIGHTBOTTOM;
+    }*/
+
+    if (PtInRect(&rcInflate, pt)) {
         // TODO: in region of interest, iterate over 8 squares, skip center and disabled ones
         // OffsetRect
         for (int y = rcInflate.top; y <= rcInflate.bottom; y += step_y) {
@@ -207,22 +214,20 @@ BOOL IsHoveringOnHandles(WINDOW_DESIGNER* pwd, HWND target, int dd, POINT pt)
                     continue;
                 }
 
-                // skip disabled handles
-                if (~propHandle & 1) {
-                    continue;
-                }
+                // TODO: skip disabled handles?
 
+                // handle is 6x6 by default
                 SetRect(&rcSquare, x, y, x + dd, y + dd);
                 if (PtInRect(&rcSquare, pt)) {
-                    return TRUE;
+                    return handle;
                 }
 
-                propHandle >>= 1;
+                handle <<= 1;
             }
         }
     }
 
-    return FALSE;
+    return -1;
 }
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
@@ -353,6 +358,15 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     btnMain = CreateWindow(L"BUTTON", L"Test", WS_VISIBLE | WS_CHILD,
         tmpTargetWidth + 20, 10, tmpControlWidth, tmpControlHeight, 
         designerData.hwndMain, NULL, hInst, nullptr);
+    staticMain = CreateWindow(L"STATIC", L"???", WS_VISIBLE | WS_CHILD,
+        tmpTargetWidth + 20, tmpControlHeight + 10, tmpControlWidth, tmpControlHeight,
+        designerData.hwndMain, NULL, hInst, nullptr);
+    staticMainFocus = CreateWindow(L"STATIC", L"???", WS_VISIBLE | WS_CHILD,
+        tmpTargetWidth + 20, tmpControlHeight * 2 + 10, 500, tmpControlHeight,
+        designerData.hwndMain, NULL, hInst, nullptr);
+    staticMainCur = CreateWindow(L"STATIC", L"???", WS_VISIBLE | WS_CHILD,
+        tmpTargetWidth + 20, tmpControlHeight * 3 + 10, 500, tmpControlHeight,
+        designerData.hwndMain, NULL, hInst, nullptr);
     CreateWindow(L"BUTTON", L"Test 1", WS_VISIBLE | WS_CHILD,
         7, 7, tmpControlWidth, tmpControlHeight, 
         designerData.hwndTarget, NULL, hInst, nullptr);
@@ -450,6 +464,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         case WM_MOUSEMOVE:
         {
+            LONG x = GET_X_LPARAM(lParam);
+            LONG y = GET_Y_LPARAM(lParam);
+
             // TODO: Mouse Drag:
             // 1. hit a control
             // 2. hit nothing
@@ -459,8 +476,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             // => black part no effect, white part will invert the color
             // => when another move come, use original mem XOR with DC again, then update mem
             if (wParam & MK_LBUTTON) {
-                LONG x = GET_X_LPARAM(lParam);
-                LONG y = GET_Y_LPARAM(lParam);
                 HDC hdc;
 
                 // check the guard: pre-drag: LB pressed
@@ -549,6 +564,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     ReleaseDC(hWnd, hdc);
                 }
             }
+            else {
+                // simple moving
+                POINT cur;
+                LONG hit_handle;
+
+                cur.x = x;
+                cur.y = y;
+                hit_handle = IsHoveringOnHandles(&designerData, cur, 6);
+
+                wchar_t buf[5] = L"\0";
+                swprintf_s(buf, 5, L"%d", hit_handle);
+                SetWindowText(staticMain, buf);
+            }
 
             break;
         }
@@ -582,7 +610,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 DrawWindowHandles(&designerData, hWnd, focus, 6, ENABLE_RIGHTBOTTOM);
             }*/
 
-            // fall-through the re-paint
+            // TODO: fall-through the re-paint: need optimize
             RedrawWindow(designerData.hwndTarget, NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW);
 
             if (designerData.bVisible) {
