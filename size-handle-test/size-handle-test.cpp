@@ -346,7 +346,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	}
 
 	ShowWindow(designerData.hwndMain, nCmdShow);
-	UpdateWindow(designerData.hwndMain);
 
 	designerData.hwndTarget = CreateWindowEx(0, szTargetLayerClass, szTargetTitle,
 		WS_CAPTION | WS_CHILDWINDOW | WS_VISIBLE | WS_DISABLED | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_SYSMENU,
@@ -366,8 +365,11 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
     focus = designerData.hwndTarget;
 
-	ShowWindow(designerData.hwndTarget, nCmdShow);
-	UpdateWindow(designerData.hwndTarget);
+    // child does not need to specify show state
+    //ShowWindow(designerData.hwndTarget, nCmdShow);
+
+    // display everything
+    UpdateWindow(designerData.hwndMain);
 
     // debug test controls
     btnMain = CreateWindow(L"BUTTON", L"Test", WS_VISIBLE | WS_CHILD,
@@ -487,14 +489,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             LONG x = GET_X_LPARAM(lParam);
             LONG y = GET_Y_LPARAM(lParam);
 
-            // TODO: Mouse Drag:
-            // 1. hit a control
-            // 2. hit nothing
-            // either case: lock target window update, move child BB (case 1) or a track rect (case 2)
-            // final: unlock target window, invalidate base window
-            // track rect: black rect and white frame in MEM DC, XOR with client DC
-            // => black part no effect, white part will invert the color
-            // => when another move come, use original mem XOR with DC again, then update mem
             if (wParam & MK_LBUTTON) {
                 HDC hdc;
 
@@ -586,6 +580,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
             else {
                 // simple moving
+
+                // TODO: updating cursor should happen unconditionally, i.e. take off the "else"
                 POINT cur;
                 LONG hit_handle;
                 HCURSOR curNext;
