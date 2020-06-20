@@ -2,6 +2,7 @@
 
 #include "resource.h"
 #include "designer.h"
+#include <stdio.h>
 
 #define MAX_LOADSTRING 100
 #define DEFAULT_TARGET_X 7

@@ -1,6 +1,30 @@
 #include "ll.h"
 #include "global.h"
 
+void debugControlList(DESIGNER_CONTROL_LIST* list)
+{
+	DESIGNER_CONTROL_ITEM* p = list->begin;
+
+	OutputDebugString(L"CONTROL LIST: \n    ");
+	while (p) {
+		DebugPrintf(L"%x -> ", (unsigned long long)(p->hwnd));
+		p = p->next;
+	}
+	OutputDebugString(L"NULL\n");
+}
+
+void debugSelectionList(DESIGNER_SELECTION_LIST* list)
+{
+	DESIGNER_SELECTION_LIST* p = list;
+
+	OutputDebugString(L"SELECTION LIST: \n    ");
+	while (p) {
+		DebugPrintf(L"%x -> ", (unsigned long long)(p->item->hwnd));
+		p = p->next;
+	}
+	OutputDebugString(L"NULL\n");
+}
+
 DESIGNER_CONTROL_LIST* NewDesignerControlList()
 {
 	DESIGNER_CONTROL_LIST* pdcl = (DESIGNER_CONTROL_LIST*)malloc(sizeof(DESIGNER_CONTROL_LIST));
@@ -24,15 +48,19 @@ void ReleaseDesignerControlList(DESIGNER_CONTROL_LIST* pdcl)
 
 DESIGNER_CONTROL_ITEM* AddDesignerControlItem(DESIGNER_CONTROL_LIST* pdcl, HWND hwnd)
 {
+	DebugPrintf(L"[ADD] Adding handle: %x\n", (unsigned long long)hwnd);
+
 	DESIGNER_CONTROL_ITEM* pdci = FindDesignerControlItem(pdcl, hwnd);
 
 	if (pdci) {
+		DebugPrintf(L"[ADD] Duplicate handle: %x\n", (unsigned long long)hwnd);
 		return pdci;
 	}
 
 	pdci = (DESIGNER_CONTROL_ITEM*)malloc(sizeof(DESIGNER_CONTROL_ITEM));
 	memset(pdci, 0, sizeof(DESIGNER_CONTROL_ITEM));
 
+	pdci->hwnd = hwnd;
 	pdci->prev = pdcl->end;
 	pdcl->end = pdci;
 	if (!pdcl->begin) {

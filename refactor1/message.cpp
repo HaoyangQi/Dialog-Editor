@@ -23,6 +23,9 @@ void OnMainCreate(WINDOW_DESIGNER* pwd, HWND hwnd)
     SetRect(&pwd->rcMargin, 7, 7, 7, 7);
     DesignerUpdateMarginBox(pwd);
 
+    // DEBUG ONLY
+    DesignerAddControl(pwd, L"BUTTON", L"#", 7, 7, 50, 50);
+
     // Oh boy, magic calls:
     // Update target window accordingly (especially SWP_DRAWFRAME).
     // Without calling once during startup will create ugly dark corner around window frame.
@@ -48,10 +51,14 @@ void OnMainLButtonPress(WINDOW_DESIGNER* pwd, HWND hWnd, WPARAM wParam, LPARAM l
     MapWindowPoints(hWnd, pwd->hwndTarget, &pt, 1);
     hitTarget = ChildWindowFromPoint(pwd->hwndTarget, pt);
 
+    // TODO: create control: the click has to be inside margin box, and overrides following if-stmt.
+
     if (hitTarget != NULL && hitTarget != pwd->hwndTarget) {
         // if hit a control
         // TODO: as for now, only single selection is supported, suppose to accumulate selection
-        ResetDesignerSelectionList(pwd->listControls, pwd->listSelection, hitTarget);
+        // check if the hit is in selection first, if so, do nothing, reset selection otherwise
+        DebugPrintf(L"[FOCUS] handle focus: %x\n", (unsigned long long)hitTarget);
+        DesignerResetSelectionToFocus(pwd, hitTarget);
         MapWindowRectToDesigner(pwd, &pwd->rcSelectionBB, hitTarget);
     }
     else {
@@ -71,7 +78,6 @@ void OnMainMouseMove(WINDOW_DESIGNER* pwd, LONG x, LONG y)
     hit_handle = IsHoveringOnHandles(pwd, cur);
     switch (hit_handle) {
         case 0:
-            // TODO: actually move cursor
             curNext = isFocusTarget(pwd) ? pwd->curDefault : pwd->curMove;
             curNext = pwd->curDefault;
             break;
@@ -113,8 +119,15 @@ void OnMainLButtonDrag(WINDOW_DESIGNER* pwd, HWND hWnd, LONG x, LONG y)
         RedrawWindow(hWnd, NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW | RDW_ERASE);
     }
 
+    // TODO: dragging rect optimization. When the track rect very close to margin box, there might remain
+    // a very small gap when mouse leaves too fast, to avoid this, ever since mouse is out, snap the rect 
+    // to the border, instead of stop tracking immediately.
     if (isFocusTarget(pwd)) {
         // if not hitting a control, show selection track rectangle
+        // For the track rectangle, it can mean two things:
+        // 1. a selection
+        // 2. a control to be created
+
         LONG trackW = abs(pwd->ptTrackStart.x - x);
         LONG trackH = abs(pwd->ptTrackStart.y - y);
 
@@ -162,6 +175,9 @@ void OnMainPaint(WINDOW_DESIGNER* pwd, HWND hWnd)
 {
     PAINTSTRUCT ps;
     HDC hdc = BeginPaint(hWnd, &ps);
+
+    debugControlList(pwd->listControls);
+    debugSelectionList(pwd->listSelection);
 
     if (pwd->bVisible && isFocusTarget(pwd)) {
         DrawControlHandles(pwd, hdc, pwd->hwndTarget, LOCK_TOPLEFT);

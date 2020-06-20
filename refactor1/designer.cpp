@@ -156,16 +156,22 @@ void DesignerUpdateMarginBox(WINDOW_DESIGNER* pwd)
     MapWindowPoints(pwd->hwndTarget, pwd->hwndMain, (LPPOINT)&pwd->rcMarginBox, 2);
 }
 
-// when adding control, selection will be cleared
-void DesignerAddControl(WINDOW_DESIGNER* pwd, HWND hwnd, LONG prop)
+// when adding control, selection should be reset
+void DesignerAddControl(WINDOW_DESIGNER* pwd, LPCWSTR className, LPCWSTR title, int x, int y, int w, int h)
 {
+    HWND hwnd = CreateWindowW(
+        className, title, WS_VISIBLE | WS_CHILD, x, y, w, h, pwd->hwndTarget, NULL, pwd->appInstance, nullptr);
     DESIGNER_CONTROL_ITEM* item = AddDesignerControlItem(pwd->listControls, hwnd);
-    //item->handle_property = prop;
-    pwd->listSelection = ResetDesignerSelectionList(pwd->listControls, pwd->listSelection, hwnd);
+    //pwd->listSelection = ResetDesignerSelectionList(pwd->listControls, pwd->listSelection, hwnd);
 }
 
 void DesignerClearSelection(WINDOW_DESIGNER* pwd)
 {
     ClearDesignerSelectionList(pwd->listSelection);
     pwd->listSelection = NULL;
+}
+
+void DesignerResetSelectionToFocus(WINDOW_DESIGNER* pwd, HWND hitTarget)
+{
+    pwd->listSelection = ResetDesignerSelectionList(pwd->listControls, pwd->listSelection, hitTarget);
 }

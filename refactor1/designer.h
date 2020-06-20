@@ -60,8 +60,11 @@ typedef struct {
 void InitWindowDesigner(WINDOW_DESIGNER*, HINSTANCE);
 void ReleaseWindowDesigner(WINDOW_DESIGNER*);
 BOOL DrawControlHandles(WINDOW_DESIGNER*, HDC, HWND, LONG);
+
+void DesignerAddControl(WINDOW_DESIGNER*, LPCWSTR, LPCWSTR, int, int, int, int);
 void DesignerUpdateMarginBox(WINDOW_DESIGNER*);
 void DesignerClearSelection(WINDOW_DESIGNER*);
+void DesignerResetSelectionToFocus(WINDOW_DESIGNER*, HWND);
 
 LONG IsHoveringOnHandles(WINDOW_DESIGNER*, POINT);
 void MapWindowRectToDesigner(WINDOW_DESIGNER*, RECT*, HWND);
