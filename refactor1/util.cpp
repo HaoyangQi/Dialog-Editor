@@ -32,7 +32,7 @@ LONG IsHoveringOnHandles(WINDOW_DESIGNER* pwd, POINT pt)
 {
     // if CTRL pressed or selection has more than one control
     if (!pwd->bDetectHandleHover || isFocusSelection(pwd)) {
-        return -1;
+        return HANDLE_NOWHERE;
     }
     
     RECT rcInflate, rcSquare;
@@ -45,7 +45,7 @@ LONG IsHoveringOnHandles(WINDOW_DESIGNER* pwd, POINT pt)
 
     // Check if inside
     if (PtInRect(&rcInflate, pt)) {
-        return 0;
+        return HANDLE_INSIDE;
     }
 
     InflateRect(&rcInflate, pwd->dd, pwd->dd);
@@ -76,5 +76,5 @@ LONG IsHoveringOnHandles(WINDOW_DESIGNER* pwd, POINT pt)
         }
     }
 
-    return -1;
+    return HANDLE_NOWHERE;
 }

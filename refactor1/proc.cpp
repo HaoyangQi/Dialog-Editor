@@ -48,7 +48,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             LONG x = GET_X_LPARAM(lParam);
             LONG y = GET_Y_LPARAM(lParam);
 
-            OnMainMouseMove(&designerData, x, y);
+            OnMainMouseMove(&designerData, wParam, x, y);
             if (wParam & MK_LBUTTON) {
                 OnMainLButtonDrag(&designerData, hWnd, x, y);
             }

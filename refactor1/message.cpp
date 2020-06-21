@@ -53,53 +53,65 @@ void OnMainLButtonPress(WINDOW_DESIGNER* pwd, HWND hWnd, WPARAM wParam, LPARAM l
 
     // TODO: create control: the click has to be inside margin box, and overrides following if-stmt.
 
-    if (hitTarget != NULL && hitTarget != pwd->hwndTarget) {
+    if (isScaleFocus(pwd)) {
+        pwd->typeTrack = TRACK_SCALE;
+        MapWindowRectToDesigner(pwd, &pwd->rcTrackPrev, 
+            pwd->listSelection ? pwd->listSelection->item->hwnd : pwd->hwndTarget);
+        pwd->ptTrackStart.x = pwd->rcTrackPrev.left;
+        pwd->ptTrackStart.y = pwd->rcTrackPrev.top;
+    }
+    else if (hitTarget != NULL && hitTarget != pwd->hwndTarget) {
         // if hit a control
         // TODO: as for now, only single selection is supported, suppose to accumulate selection
         // check if the hit is in selection first, if so, do nothing, reset selection otherwise
-        DebugPrintf(L"[FOCUS] handle focus: %x\n", (unsigned long long)hitTarget);
+        pwd->typeTrack = TRACK_MOVE;
         DesignerResetSelectionToFocus(pwd, hitTarget);
         MapWindowRectToDesigner(pwd, &pwd->rcSelectionBB, hitTarget);
         CopyRect(&pwd->rcPreDragBB, &pwd->rcSelectionBB);
     }
     else {
         // anywhere else, reset focus
+        pwd->typeTrack = TRACK_SELECTION;
         DesignerClearSelection(pwd);
     }
 
     RedrawWindow(hWnd, NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW | RDW_ERASE);
 }
 
-void OnMainMouseMove(WINDOW_DESIGNER* pwd, LONG x, LONG y)
+void OnMainMouseMove(WINDOW_DESIGNER* pwd, WPARAM wParam, LONG x, LONG y)
 {
     POINT cur = { x, y };
-    LONG hit_handle;
     HCURSOR curNext;
 
-    hit_handle = IsHoveringOnHandles(pwd, cur);
-    switch (hit_handle) {
-        case 0:
-            curNext = isFocusTarget(pwd) ? pwd->curDefault : pwd->curMove;
-            break;
-        case HANDLE_TOP_LEFT:
-        case HANDLE_BOTTOM_RIGHT:
-            curNext = pwd->curSE;
-            break;
-        case HANDLE_TOP_CENTER:
-        case HANDLE_BOTTOM_CENTER:
-            curNext = pwd->curUD;
-            break;
-        case HANDLE_TOP_RIGHT:
-        case HANDLE_BOTTOM_LEFT:
-            curNext = pwd->curNE;
-            break;
-        case HANDLE_MIDDLE_LEFT:
-        case HANDLE_MIDDLE_RIGHT:
-            curNext = pwd->curLR;
-            break;
-        default:
-            curNext = pwd->curDefault;
-            break;
+    if (wParam & MK_LBUTTON) {
+        curNext = pwd->curCurrent;
+    }
+    else {
+        pwd->lHandle = IsHoveringOnHandles(pwd, cur);
+        switch (pwd->lHandle) {
+            case HANDLE_INSIDE:
+                curNext = isFocusTarget(pwd) ? pwd->curDefault : pwd->curMove;
+                break;
+            case HANDLE_TOP_LEFT:
+            case HANDLE_BOTTOM_RIGHT:
+                curNext = pwd->curSE;
+                break;
+            case HANDLE_TOP_CENTER:
+            case HANDLE_BOTTOM_CENTER:
+                curNext = pwd->curUD;
+                break;
+            case HANDLE_TOP_RIGHT:
+            case HANDLE_BOTTOM_LEFT:
+                curNext = pwd->curNE;
+                break;
+            case HANDLE_MIDDLE_LEFT:
+            case HANDLE_MIDDLE_RIGHT:
+                curNext = pwd->curLR;
+                break;
+            default:
+                curNext = pwd->curDefault;
+                break;
+        }
     }
 
     if (curNext != pwd->curCurrent || curNext != GetCursor()) {
@@ -119,31 +131,20 @@ void OnMainLButtonDrag(WINDOW_DESIGNER* pwd, HWND hWnd, LONG x, LONG y)
 
     HDC hdc = GetDC(hWnd);
 
-    // TODO: dragging rect optimization. When the track rect very close to margin box, there might remain
-    // a very small gap when mouse leaves too fast, to avoid this, ever since mouse is out, snap the rect 
-    // to the border, instead of stop tracking immediately.
-    if (isFocusTarget(pwd)) {
-        // if not hitting a control, show selection track rectangle
-        // For the track rectangle, it can mean two things:
-        // 1. a selection
-        // 2. a control to be created
-
+    if (pwd->typeTrack == TRACK_SELECTION) {
+        // if not hitting a control or any valid handle, show selection track rectangle
         LONG trackW = abs(pwd->ptTrackStart.x - x);
         LONG trackH = abs(pwd->ptTrackStart.y - y);
 
         x = min(pwd->ptTrackStart.x, x);
         y = min(pwd->ptTrackStart.y, y);
 
-        //hdc = GetDC(hWnd);
-
         // DrawFocusRect is XOR, re-apply on same rect again will erase it
         DrawFocusRect(hdc, &pwd->rcTrackPrev);
         SetRect(&pwd->rcTrackPrev, x, y, x + trackW, y + trackH);
         DrawFocusRect(hdc, &pwd->rcTrackPrev);
-
-        //ReleaseDC(hWnd, hdc);
     }
-    else {
+    else if (pwd->typeTrack == TRACK_MOVE) {
         // if a selection is still active when drag starts, then we are dragging it
         LONG dx = x - pwd->ptTrackStart.x;
         LONG dy = y - pwd->ptTrackStart.y;
@@ -176,27 +177,41 @@ void OnMainLButtonDrag(WINDOW_DESIGNER* pwd, HWND hWnd, LONG x, LONG y)
         }
         DrawFocusRect(hdc, &pwd->rcSelectionBB);
     }
+    else if (pwd->typeTrack == TRACK_SCALE) {
+        // TODO: scale based on handles, margin box, only scale along corresponding direction
+        LONG trackW = abs(pwd->ptTrackStart.x - x);
+        LONG trackH = abs(pwd->ptTrackStart.y - y);
+
+        x = min(pwd->ptTrackStart.x, x);
+        y = min(pwd->ptTrackStart.y, y);
+
+        // DrawFocusRect is XOR, re-apply on same rect again will erase it
+        DrawFocusRect(hdc, &pwd->rcTrackPrev);
+        SetRect(&pwd->rcTrackPrev, x, y, x + trackW, y + trackH);
+        DrawFocusRect(hdc, &pwd->rcTrackPrev);
+    }
 
     ReleaseDC(hWnd, hdc);
 }
 
 void OnMainLButtonRelease(WINDOW_DESIGNER* pwd, HWND hWnd)
 {
-    pwd->bVisible = TRUE;
-
-    // move controls based on BB
-    LONG dx = pwd->rcSelectionBB.left - pwd->rcPreDragBB.left;
-    LONG dy = pwd->rcSelectionBB.top - pwd->rcPreDragBB.top;
-    DESIGNER_SELECTION_LIST* l = pwd->listSelection;
-    RECT rcWindow;
-    while (l) {
-        GetWindowRect(l->item->hwnd, &rcWindow);
-        MapWindowPoints(HWND_DESKTOP, pwd->hwndTarget, (LPPOINT)&rcWindow, 2);
-        MoveWindow(l->item->hwnd, rcWindow.left + dx, rcWindow.top + dy, 
-            rcWindow.right - rcWindow.left, rcWindow.bottom - rcWindow.top, FALSE);
-        l = l->next;
+    if (pwd->typeTrack == TRACK_MOVE) {
+        LONG dx = pwd->rcSelectionBB.left - pwd->rcPreDragBB.left;
+        LONG dy = pwd->rcSelectionBB.top - pwd->rcPreDragBB.top;
+        DESIGNER_SELECTION_LIST* l = pwd->listSelection;
+        RECT rcWindow;
+        while (l) {
+            GetWindowRect(l->item->hwnd, &rcWindow);
+            MapWindowPoints(HWND_DESKTOP, pwd->hwndTarget, (LPPOINT)&rcWindow, 2);
+            MoveWindow(l->item->hwnd, rcWindow.left + dx, rcWindow.top + dy,
+                rcWindow.right - rcWindow.left, rcWindow.bottom - rcWindow.top, FALSE);
+            l = l->next;
+        }
     }
 
+    pwd->typeTrack = NO_TRACK;
+    pwd->bVisible = TRUE;
     RedrawWindow(hWnd, NULL, NULL, RDW_INVALIDATE | RDW_NOCHILDREN | RDW_UPDATENOW | RDW_ERASE);
     RedrawWindow(pwd->hwndTarget, NULL, NULL, RDW_INVALIDATE | RDW_FRAME | RDW_ALLCHILDREN | RDW_UPDATENOW | RDW_ERASE);
 }

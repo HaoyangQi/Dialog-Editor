@@ -18,6 +18,9 @@
 #define HANDLE_BOTTOM_LEFT   0x20
 #define HANDLE_BOTTOM_CENTER 0x40
 #define HANDLE_BOTTOM_RIGHT  0x80
+// dummy bits, flag only
+#define HANDLE_INSIDE        0x100
+#define HANDLE_NOWHERE       0x200
 
 #define ENABLE_ALL           0xFF
 #define ENABLE_VERTICES      0xA5 // TL|TR|BL|BR

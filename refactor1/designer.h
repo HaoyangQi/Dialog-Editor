@@ -8,6 +8,15 @@
 #define isFocusTarget(designer) (!(designer)->listSelection)
 #define isFocusControl(designer) ((designer)->listSelection && !(designer)->listSelection->next)
 #define isFocusSelection(designer) ((designer)->listSelection && (designer)->listSelection->next)
+#define isScaleFocus(designer) ((designer)->lHandle & ENABLE_ALL)
+
+typedef enum {
+	NO_TRACK = 0,
+	TRACK_SELECTION,
+	TRACK_SCALE,
+	TRACK_CREATE,
+	TRACK_MOVE
+} TRACK_TYPE;
 
 // All coordinates are in base window coordinate
 typedef struct {
@@ -47,6 +56,8 @@ typedef struct {
 	RECT rcMarginBox; // Position of margin box (base window coordinates)
 
 	// Mouse Track & Capture
+	TRACK_TYPE typeTrack;
+	LONG lHandle;
 	POINT ptTrackStart;
 	RECT rcTrackPrev;
 	RECT rcSelectionBB;

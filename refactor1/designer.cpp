@@ -25,6 +25,8 @@ void InitWindowDesigner(WINDOW_DESIGNER* pwd, HINSTANCE hInst)
     pwd->bVisible = TRUE;
     pwd->dd = 6;
     pwd->bDetectHandleHover = TRUE;
+    pwd->typeTrack = NO_TRACK;
+    pwd->lHandle = HANDLE_NOWHERE;
 
     // additional procedural initialize
     pwd->hdcHandleDisable = CreateCompatibleDC(NULL);
