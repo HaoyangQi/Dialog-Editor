@@ -60,6 +60,7 @@ void OnMainLButtonPress(WINDOW_DESIGNER* pwd, HWND hWnd, WPARAM wParam, LPARAM l
         DebugPrintf(L"[FOCUS] handle focus: %x\n", (unsigned long long)hitTarget);
         DesignerResetSelectionToFocus(pwd, hitTarget);
         MapWindowRectToDesigner(pwd, &pwd->rcSelectionBB, hitTarget);
+        CopyRect(&pwd->rcPreDragBB, &pwd->rcSelectionBB);
     }
     else {
         // anywhere else, reset focus
@@ -79,7 +80,6 @@ void OnMainMouseMove(WINDOW_DESIGNER* pwd, LONG x, LONG y)
     switch (hit_handle) {
         case 0:
             curNext = isFocusTarget(pwd) ? pwd->curDefault : pwd->curMove;
-            curNext = pwd->curDefault;
             break;
         case HANDLE_TOP_LEFT:
         case HANDLE_BOTTOM_RIGHT:
@@ -110,14 +110,14 @@ void OnMainMouseMove(WINDOW_DESIGNER* pwd, LONG x, LONG y)
 
 void OnMainLButtonDrag(WINDOW_DESIGNER* pwd, HWND hWnd, LONG x, LONG y)
 {
-    HDC hdc;
-
     // check the guard: pre-drag: LB pressed
     if (pwd->bVisible) {
         pwd->bVisible = FALSE;
         // immediate refresh to purge any existing handles
         RedrawWindow(hWnd, NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW | RDW_ERASE);
     }
+
+    HDC hdc = GetDC(hWnd);
 
     // TODO: dragging rect optimization. When the track rect very close to margin box, there might remain
     // a very small gap when mouse leaves too fast, to avoid this, ever since mouse is out, snap the rect 
@@ -134,25 +134,71 @@ void OnMainLButtonDrag(WINDOW_DESIGNER* pwd, HWND hWnd, LONG x, LONG y)
         x = min(pwd->ptTrackStart.x, x);
         y = min(pwd->ptTrackStart.y, y);
 
-        hdc = GetDC(hWnd);
+        //hdc = GetDC(hWnd);
 
         // DrawFocusRect is XOR, re-apply on same rect again will erase it
         DrawFocusRect(hdc, &pwd->rcTrackPrev);
         SetRect(&pwd->rcTrackPrev, x, y, x + trackW, y + trackH);
         DrawFocusRect(hdc, &pwd->rcTrackPrev);
 
-        ReleaseDC(hWnd, hdc);
+        //ReleaseDC(hWnd, hdc);
     }
     else {
-        ;// TODO: if a selection is still active when drag starts, then we are dragging it
+        // if a selection is still active when drag starts, then we are dragging it
+        LONG dx = x - pwd->ptTrackStart.x;
+        LONG dy = y - pwd->ptTrackStart.y;
+
+        // TODO: another way to draw is to draw one BB for each control
+        // currently is the BB of whole selection
+
+        // clear previous
+        DrawFocusRect(hdc, &pwd->rcSelectionBB);
+        // if any coordinate is out, snap it to nearest margin border
+        // start simulating X
+        OffsetRect(&pwd->rcSelectionBB, dx, 0);
+        if (!IsSubRect(&pwd->rcSelectionBB, &pwd->rcMarginBox)) {
+            dx = pwd->rcMarginBox.left - pwd->rcSelectionBB.left;
+            dx = dx >= 0 ? dx : pwd->rcMarginBox.right - pwd->rcSelectionBB.right;
+            OffsetRect(&pwd->rcSelectionBB, dx, 0);
+        }
+        else {
+            pwd->ptTrackStart.x = x;
+        }
+        // start simulating Y
+        OffsetRect(&pwd->rcSelectionBB, 0, dy);
+        if (!IsSubRect(&pwd->rcSelectionBB, &pwd->rcMarginBox)) {
+            dy = pwd->rcMarginBox.top - pwd->rcSelectionBB.top;
+            dy = dy >= 0 ? dy : pwd->rcMarginBox.bottom - pwd->rcSelectionBB.bottom;
+            OffsetRect(&pwd->rcSelectionBB, 0, dy);
+        }
+        else {
+            pwd->ptTrackStart.y = y;
+        }
+        DrawFocusRect(hdc, &pwd->rcSelectionBB);
     }
+
+    ReleaseDC(hWnd, hdc);
 }
 
 void OnMainLButtonRelease(WINDOW_DESIGNER* pwd, HWND hWnd)
 {
     pwd->bVisible = TRUE;
-    // TODO: move controls based on BB
-    InvalidateRect(hWnd, NULL, TRUE);
+
+    // move controls based on BB
+    LONG dx = pwd->rcSelectionBB.left - pwd->rcPreDragBB.left;
+    LONG dy = pwd->rcSelectionBB.top - pwd->rcPreDragBB.top;
+    DESIGNER_SELECTION_LIST* l = pwd->listSelection;
+    RECT rcWindow;
+    while (l) {
+        GetWindowRect(l->item->hwnd, &rcWindow);
+        MapWindowPoints(HWND_DESKTOP, pwd->hwndTarget, (LPPOINT)&rcWindow, 2);
+        MoveWindow(l->item->hwnd, rcWindow.left + dx, rcWindow.top + dy, 
+            rcWindow.right - rcWindow.left, rcWindow.bottom - rcWindow.top, FALSE);
+        l = l->next;
+    }
+
+    RedrawWindow(hWnd, NULL, NULL, RDW_INVALIDATE | RDW_NOCHILDREN | RDW_UPDATENOW | RDW_ERASE);
+    RedrawWindow(pwd->hwndTarget, NULL, NULL, RDW_INVALIDATE | RDW_FRAME | RDW_ALLCHILDREN | RDW_UPDATENOW | RDW_ERASE);
 }
 
 /** 
@@ -176,8 +222,8 @@ void OnMainPaint(WINDOW_DESIGNER* pwd, HWND hWnd)
     PAINTSTRUCT ps;
     HDC hdc = BeginPaint(hWnd, &ps);
 
-    debugControlList(pwd->listControls);
-    debugSelectionList(pwd->listSelection);
+    //debugControlList(pwd->listControls);
+    //debugSelectionList(pwd->listSelection);
 
     if (pwd->bVisible && isFocusTarget(pwd)) {
         DrawControlHandles(pwd, hdc, pwd->hwndTarget, LOCK_TOPLEFT);

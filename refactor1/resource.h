@@ -15,10 +15,10 @@
 #define IDB_HANDLE_ENABLE               129
 #define IDB_HANDLE_DISABLE              130
 #define IDC_MOVE                        131
+#define IDC_MOVE_CTL                    131
 #define IDC_RESIZE_H                    132
 #define IDC_RESIZE_V                    134
 #define IDC_RESIZE_NE                   135
-#define IDC_CURSOR1                     136
 #define IDC_RESIZE_SE                   136
 #define IDC_STATIC                      -1
 

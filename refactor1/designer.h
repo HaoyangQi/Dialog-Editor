@@ -50,6 +50,7 @@ typedef struct {
 	POINT ptTrackStart;
 	RECT rcTrackPrev;
 	RECT rcSelectionBB;
+	RECT rcPreDragBB;
 	BOOL bDetectHandleHover;
 
 	// Controls and Selection
@@ -65,6 +66,8 @@ void DesignerAddControl(WINDOW_DESIGNER*, LPCWSTR, LPCWSTR, int, int, int, int);
 void DesignerUpdateMarginBox(WINDOW_DESIGNER*);
 void DesignerClearSelection(WINDOW_DESIGNER*);
 void DesignerResetSelectionToFocus(WINDOW_DESIGNER*, HWND);
+void DesignerAddToSelection(WINDOW_DESIGNER*, HWND);
 
+BOOL IsSubRect(const RECT*, const RECT*);
 LONG IsHoveringOnHandles(WINDOW_DESIGNER*, POINT);
 void MapWindowRectToDesigner(WINDOW_DESIGNER*, RECT*, HWND);

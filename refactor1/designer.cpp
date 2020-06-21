@@ -34,7 +34,7 @@ void InitWindowDesigner(WINDOW_DESIGNER* pwd, HINSTANCE hInst)
     pwd->bmpHandleEnable = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_HANDLE_ENABLE));
     pwd->bmpHandleDisable = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_HANDLE_DISABLE));
     pwd->curDefault = LoadCursor(NULL, IDC_ARROW);
-    pwd->curMove = LoadCursor(hInst, MAKEINTRESOURCE(IDC_MOVE));
+    pwd->curMove = LoadCursor(hInst, MAKEINTRESOURCE(IDC_MOVE_CTL));
     pwd->curLR = LoadCursor(hInst, MAKEINTRESOURCE(IDC_RESIZE_H));
     pwd->curUD = LoadCursor(hInst, MAKEINTRESOURCE(IDC_RESIZE_V));
     pwd->curNE = LoadCursor(hInst, MAKEINTRESOURCE(IDC_RESIZE_NE));
@@ -161,6 +161,11 @@ void DesignerAddControl(WINDOW_DESIGNER* pwd, LPCWSTR className, LPCWSTR title, 
 {
     HWND hwnd = CreateWindowW(
         className, title, WS_VISIBLE | WS_CHILD, x, y, w, h, pwd->hwndTarget, NULL, pwd->appInstance, nullptr);
+
+    if (!hwnd) {
+        return;
+    }
+
     DESIGNER_CONTROL_ITEM* item = AddDesignerControlItem(pwd->listControls, hwnd);
     //pwd->listSelection = ResetDesignerSelectionList(pwd->listControls, pwd->listSelection, hwnd);
 }
@@ -174,4 +179,17 @@ void DesignerClearSelection(WINDOW_DESIGNER* pwd)
 void DesignerResetSelectionToFocus(WINDOW_DESIGNER* pwd, HWND hitTarget)
 {
     pwd->listSelection = ResetDesignerSelectionList(pwd->listControls, pwd->listSelection, hitTarget);
+}
+
+void DesignerAddToSelection(WINDOW_DESIGNER* pwd, HWND hitTarget)
+{
+    pwd->listSelection = AccumulateSelection(pwd->listControls, pwd->listSelection, hitTarget);
+
+    // update BB
+    RECT rcTarget;
+    MapWindowRectToDesigner(pwd, &rcTarget, hitTarget);
+    pwd->rcSelectionBB.left = min(pwd->rcSelectionBB.left, rcTarget.left);
+    pwd->rcSelectionBB.top = min(pwd->rcSelectionBB.top, rcTarget.top);
+    pwd->rcSelectionBB.right = max(pwd->rcSelectionBB.right, rcTarget.right);
+    pwd->rcSelectionBB.bottom = max(pwd->rcSelectionBB.bottom, rcTarget.bottom);
 }
