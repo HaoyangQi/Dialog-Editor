@@ -122,14 +122,20 @@ void OnMainMouseMove(WINDOW_DESIGNER* pwd, WPARAM wParam, LONG x, LONG y)
 
 void OnMainLButtonDrag(WINDOW_DESIGNER* pwd, HWND hWnd, LONG x, LONG y)
 {
+    HDC hdc = GetDC(hWnd);
+    
     // check the guard: pre-drag: LB pressed
     if (pwd->bVisible) {
         pwd->bVisible = FALSE;
         // immediate refresh to purge any existing handles
         RedrawWindow(hWnd, NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW | RDW_ERASE);
+
+        if (pwd->typeTrack == TRACK_SCALE) {
+            DrawFocusRect(hdc, &pwd->rcTrackPrev);
+        }
     }
 
-    HDC hdc = GetDC(hWnd);
+    //HDC hdc = GetDC(hWnd);
 
     if (pwd->typeTrack == TRACK_SELECTION) {
         // if not hitting a control or any valid handle, show selection track rectangle
@@ -179,11 +185,61 @@ void OnMainLButtonDrag(WINDOW_DESIGNER* pwd, HWND hWnd, LONG x, LONG y)
     }
     else if (pwd->typeTrack == TRACK_SCALE) {
         // TODO: scale based on handles, margin box, only scale along corresponding direction
-        LONG trackW = abs(pwd->ptTrackStart.x - x);
-        LONG trackH = abs(pwd->ptTrackStart.y - y);
+        LONG trackW, trackH;
 
-        x = min(pwd->ptTrackStart.x, x);
-        y = min(pwd->ptTrackStart.y, y);
+        switch (pwd->lHandle) {
+            case HANDLE_TOP_LEFT:
+                trackW = max(pwd->rcTrackPrev.right - x, 0);
+                trackH = max(pwd->rcTrackPrev.bottom - y, 0);
+                x = min(pwd->rcTrackPrev.right, x);
+                y = min(pwd->rcTrackPrev.bottom, y);
+                break;
+            case HANDLE_BOTTOM_RIGHT:
+                trackW = max(x - pwd->ptTrackStart.x, 0);
+                trackH = max(y - pwd->ptTrackStart.y, 0);
+                x = pwd->ptTrackStart.x;
+                y = pwd->ptTrackStart.y;
+                break;
+            case HANDLE_TOP_CENTER:
+                trackW = pwd->rcTrackPrev.right - pwd->rcTrackPrev.left;
+                trackH = max(pwd->rcTrackPrev.bottom - y, 0);
+                x = pwd->rcTrackPrev.left;
+                y = min(pwd->rcTrackPrev.bottom, y);
+                break;
+            case HANDLE_BOTTOM_CENTER:
+                trackW = pwd->rcTrackPrev.right - pwd->rcTrackPrev.left;
+                trackH = max(y - pwd->ptTrackStart.y, 0);
+                x = pwd->ptTrackStart.x;
+                y = pwd->ptTrackStart.y;
+                break;
+            case HANDLE_TOP_RIGHT:
+                trackW = max(x - pwd->ptTrackStart.x, 0);
+                trackH = max(pwd->rcTrackPrev.bottom - y, 0);
+                x = pwd->ptTrackStart.x;
+                y = min(pwd->rcTrackPrev.bottom, y);
+                break;
+            case HANDLE_BOTTOM_LEFT:
+                trackW = max(pwd->rcTrackPrev.right - x, 0);
+                trackH = max(y - pwd->ptTrackStart.y, 0);
+                x = min(pwd->rcTrackPrev.right, x);
+                y = pwd->ptTrackStart.y;
+                break;
+            case HANDLE_MIDDLE_LEFT:
+                trackW = max(pwd->rcTrackPrev.right - x, 0);
+                trackH = pwd->rcTrackPrev.bottom - pwd->rcTrackPrev.top;
+                x = min(pwd->rcTrackPrev.right, x);
+                y = pwd->ptTrackStart.y;
+                break;
+            case HANDLE_MIDDLE_RIGHT:
+                trackW = max(x - pwd->ptTrackStart.x, 0);
+                trackH = pwd->rcTrackPrev.bottom - pwd->rcTrackPrev.top;
+                x = pwd->ptTrackStart.x;
+                y = pwd->ptTrackStart.y;
+                break;
+            default:
+                // should never reach here
+                break;
+        }
 
         // DrawFocusRect is XOR, re-apply on same rect again will erase it
         DrawFocusRect(hdc, &pwd->rcTrackPrev);
