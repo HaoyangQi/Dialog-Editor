@@ -185,7 +185,7 @@ void OnMainLButtonDrag(WINDOW_DESIGNER* pwd, HWND hWnd, LONG x, LONG y)
     }
     else if (pwd->typeTrack == TRACK_SCALE) {
         // TODO: scale based on handles, margin box, only scale along corresponding direction
-        LONG trackW, trackH;
+        LONG trackW = 0, trackH = 0;
 
         switch (pwd->lHandle) {
             case HANDLE_TOP_LEFT:
@@ -252,10 +252,11 @@ void OnMainLButtonDrag(WINDOW_DESIGNER* pwd, HWND hWnd, LONG x, LONG y)
 
 void OnMainLButtonRelease(WINDOW_DESIGNER* pwd, HWND hWnd)
 {
+    DESIGNER_SELECTION_LIST* l = pwd->listSelection;
+
     if (pwd->typeTrack == TRACK_MOVE) {
         LONG dx = pwd->rcSelectionBB.left - pwd->rcPreDragBB.left;
         LONG dy = pwd->rcSelectionBB.top - pwd->rcPreDragBB.top;
-        DESIGNER_SELECTION_LIST* l = pwd->listSelection;
         RECT rcWindow;
         while (l) {
             GetWindowRect(l->item->hwnd, &rcWindow);
@@ -263,6 +264,19 @@ void OnMainLButtonRelease(WINDOW_DESIGNER* pwd, HWND hWnd)
             MoveWindow(l->item->hwnd, rcWindow.left + dx, rcWindow.top + dy,
                 rcWindow.right - rcWindow.left, rcWindow.bottom - rcWindow.top, FALSE);
             l = l->next;
+        }
+    }
+    else if (pwd->typeTrack == TRACK_SCALE) {
+        if (isFocusTarget(pwd)) {
+            MoveWindow(pwd->hwndTarget, pwd->rcTrackPrev.left, pwd->rcTrackPrev.top,
+                pwd->rcTrackPrev.right - pwd->rcTrackPrev.left, pwd->rcTrackPrev.bottom - pwd->rcTrackPrev.top, FALSE);
+            DesignerUpdateMarginBox(pwd);
+        }
+        else {
+            // it is safe to use *else* here because a selection cannot be scaled
+            MapWindowPoints(pwd->hwndMain, pwd->hwndTarget, (LPPOINT)&pwd->rcTrackPrev, 2);
+            MoveWindow(l->item->hwnd, pwd->rcTrackPrev.left, pwd->rcTrackPrev.top,
+                pwd->rcTrackPrev.right - pwd->rcTrackPrev.left, pwd->rcTrackPrev.bottom - pwd->rcTrackPrev.top, FALSE);
         }
     }
 

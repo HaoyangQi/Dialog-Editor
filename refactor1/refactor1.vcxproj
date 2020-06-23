@@ -146,6 +146,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="designer.h" />
+    <ClInclude Include="dlgdata.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="global.h" />
     <ClInclude Include="ll.h" />
@@ -156,7 +157,9 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="control.cpp" />
     <ClCompile Include="designer.cpp" />
+    <ClCompile Include="dlgdata.cpp" />
     <ClCompile Include="ll.cpp" />
     <ClCompile Include="message.cpp" />
     <ClCompile Include="proc.cpp" />

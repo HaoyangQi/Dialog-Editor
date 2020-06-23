@@ -42,6 +42,9 @@
     <ClInclude Include="ll.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="dlgdata.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="refactor1.cpp">
@@ -60,6 +63,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ll.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="control.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="dlgdata.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

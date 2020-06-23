@@ -4,6 +4,7 @@
 #include <windowsx.h>
 #include "global.h"
 #include "ll.h"
+#include "dlgdata.h"
 
 #define isFocusTarget(designer) (!(designer)->listSelection)
 #define isFocusControl(designer) ((designer)->listSelection && !(designer)->listSelection->next)
@@ -67,6 +68,10 @@ typedef struct {
 	// Controls and Selection
 	DESIGNER_CONTROL_LIST* listControls;
 	DESIGNER_SELECTION_LIST* listSelection;
+
+	// Dialog Template
+	// all detailed design data are originated from handles, preserved by the control list.
+	DIALOG_TEMPLATE_DATA* pDlgTemplate;
 } WINDOW_DESIGNER;
 
 void InitWindowDesigner(WINDOW_DESIGNER*, HINSTANCE);
@@ -78,6 +83,7 @@ void DesignerUpdateMarginBox(WINDOW_DESIGNER*);
 void DesignerClearSelection(WINDOW_DESIGNER*);
 void DesignerResetSelectionToFocus(WINDOW_DESIGNER*, HWND);
 void DesignerAddToSelection(WINDOW_DESIGNER*, HWND);
+int DesignerCompileTemplate(WINDOW_DESIGNER*);
 
 BOOL IsSubRect(const RECT*, const RECT*);
 LONG IsHoveringOnHandles(WINDOW_DESIGNER*, POINT);

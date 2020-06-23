@@ -22,14 +22,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             // Parse the menu selections:
             switch (wmId)
             {
-            case IDM_ABOUT:
-                DialogBox(designerData.appInstance, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
-                break;
-            case IDM_EXIT:
-                DestroyWindow(hWnd);
-                break;
-            default:
-                return DefWindowProc(hWnd, message, wParam, lParam);
+                case IDM_ABOUT:
+                    DialogBox(designerData.appInstance, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+                    break;
+                case IDM_EXIT:
+                    DestroyWindow(hWnd);
+                    break;
+                case IDM_RUNDIALOG:
+                    DesignerCompileTemplate(&designerData);
+                    break;
+                default:
+                    return DefWindowProc(hWnd, message, wParam, lParam);
             }
             break;
         }
@@ -106,4 +109,21 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     }
     return (INT_PTR)FALSE;
+}
+
+INT_PTR CALLBACK DialogDummyProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    switch (msg) {
+    case WM_INITDIALOG:
+        return (INT_PTR)TRUE;
+    case WM_CLOSE:
+        EndDialog(hDlg, 0);
+        break;
+    case WM_COMMAND:
+        break;
+    default:
+        break;
+    }
+
+    return FALSE;
 }
