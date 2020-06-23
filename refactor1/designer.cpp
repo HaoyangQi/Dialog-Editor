@@ -265,11 +265,55 @@ int DesignerCompileTemplate(WINDOW_DESIGNER* pwd)
         pItem->y = infoWindow.rcWindow.top;
         pItem->cx = infoWindow.rcWindow.right - infoWindow.rcWindow.left;
         pItem->cy = infoWindow.rcWindow.bottom - infoWindow.rcWindow.top;
-        // class: for now, just map to *BUTTON*, but it is wrong
-        pItem->size_class = sizeof(WCHAR) * 2;
-        pItem->windowClass = (WCHAR*)malloc(pItem->size_class);
-        pItem->windowClass[0] = 0xFFFF;
-        pItem->windowClass[1] = 0x0080;
+        // class: class name is 256 characters maximum
+        WCHAR strCtrlClassName[256] = L"\0";
+        GetClassNameW(pci->hwnd, strCtrlClassName, 256);
+        DebugPrintf(L"Control Class: %s\n", strCtrlClassName);
+        if (!wcscmp(strCtrlClassName, WC_BUTTONW)) {
+            DebugPrintf(L"Button Detected.\n");
+            pItem->size_class = sizeof(WCHAR) * 2;
+            pItem->windowClass = (WCHAR*)malloc(pItem->size_class);
+            pItem->windowClass[0] = 0xFFFF;
+            pItem->windowClass[1] = 0x0080;
+        }
+        else if (!wcscmp(strCtrlClassName, WC_EDITW)) {
+            pItem->size_class = sizeof(WCHAR) * 2;
+            pItem->windowClass = (WCHAR*)malloc(pItem->size_class);
+            pItem->windowClass[0] = 0xFFFF;
+            pItem->windowClass[1] = 0x0081;
+        }
+        else if (!wcscmp(strCtrlClassName, WC_STATICW)) {
+            pItem->size_class = sizeof(WCHAR) * 2;
+            pItem->windowClass = (WCHAR*)malloc(pItem->size_class);
+            pItem->windowClass[0] = 0xFFFF;
+            pItem->windowClass[1] = 0x0082;
+        }
+        else if (!wcscmp(strCtrlClassName, WC_LISTBOXW)) {
+            pItem->size_class = sizeof(WCHAR) * 2;
+            pItem->windowClass = (WCHAR*)malloc(pItem->size_class);
+            pItem->windowClass[0] = 0xFFFF;
+            pItem->windowClass[1] = 0x0083;
+        }
+        else if (!wcscmp(strCtrlClassName, WC_SCROLLBARW)) {
+            pItem->size_class = sizeof(WCHAR) * 2;
+            pItem->windowClass = (WCHAR*)malloc(pItem->size_class);
+            pItem->windowClass[0] = 0xFFFF;
+            pItem->windowClass[1] = 0x0084;
+        }
+        else if (!wcscmp(strCtrlClassName, WC_COMBOBOXW)) {
+            pItem->size_class = sizeof(WCHAR) * 2;
+            pItem->windowClass = (WCHAR*)malloc(pItem->size_class);
+            pItem->windowClass[0] = 0xFFFF;
+            pItem->windowClass[1] = 0x0085;
+        }
+        else {
+            // it is a non-standard control, copy over class name
+            DebugPrintf(L"Non-standard Control Detected.\n");
+            pItem->size_class = sizeof(WCHAR) * (wcslen(strCtrlClassName) + 1);
+            pItem->windowClass = (WCHAR*)malloc(pItem->size_class);
+            memset(pItem->windowClass, 0, pItem->size_class);
+            wcsncpy(pItem->windowClass, strCtrlClassName, wcslen(strCtrlClassName));
+        }
         // title
         pItem->size_title = sizeof(WCHAR) * (GetWindowTextLengthW(pci->hwnd) + 1);
         pItem->title = (WCHAR*)malloc(pItem->size_title);

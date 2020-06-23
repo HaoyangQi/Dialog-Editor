@@ -3,6 +3,7 @@
 #pragma warning(disable: 4311)
 
 #include <windows.h>
+#include <commctrl.h>
 
 #define DLG_MEM_SUCCESS 0
 #define DLG_MEM_ALLOC_FAILED 1
