@@ -227,6 +227,7 @@ void TemplateRelease(DIALOG_TEMPLATE_DATA* pdtd)
 	free(pdtd->menu);
 	free(pdtd->windowClass);
 	free(pdtd->title);
+	free(pdtd->typeface);
 
 	DIALOG_TEMPLATE_ITEM_DATA* pItem = pdtd->pItemBegin, * pTemp;
 	while (pItem) {

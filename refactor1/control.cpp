@@ -42,19 +42,6 @@ DIALOG_TEMPLATE_ITEM_DATA* TemplateFindByControlID(DIALOG_TEMPLATE_DATA* pdtd, i
 	return NULL;
 }
 
-bool TemplateSafeDeleteControlItem(DIALOG_TEMPLATE_ITEM_DATA* pItem)
-{
-	if (!pItem || pItem->prev || pItem->next) {
-		return false;
-	}
-
-	free(pItem->windowClass);
-	free(pItem->title);
-	free(pItem->extraData);
-	free(pItem);
-	return true;
-}
-
 void TemplateDeleteByReference(DIALOG_TEMPLATE_DATA* pdtd, DIALOG_TEMPLATE_ITEM_DATA* pItem)
 {
 	if (pItem->prev) {
@@ -71,11 +58,12 @@ void TemplateDeleteByReference(DIALOG_TEMPLATE_DATA* pdtd, DIALOG_TEMPLATE_ITEM_
 		pdtd->pItemEnd = pItem->prev;
 	}
 
-	pItem->prev = NULL;
-	pItem->next = NULL;
-	if (TemplateSafeDeleteControlItem(pItem)) {
-		pdtd->cDlgItems--;
-	}
+	free(pItem->windowClass);
+	free(pItem->title);
+	free(pItem->extraData);
+	free(pItem);
+
+	pdtd->cDlgItems--;
 }
 
 void TemplateDeleteByItemID(DIALOG_TEMPLATE_DATA* pdtd, int id)

@@ -29,7 +29,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     DestroyWindow(hWnd);
                     break;
                 case IDM_RUNDIALOG:
-                    DesignerCompileTemplate(&designerData);
+                    DesignerLaunchTemplate(&designerData);
                     break;
                 default:
                     return DefWindowProc(hWnd, message, wParam, lParam);

@@ -74,17 +74,29 @@ typedef struct {
 	DIALOG_TEMPLATE_DATA* pDlgTemplate;
 } WINDOW_DESIGNER;
 
+// core draw call
 void InitWindowDesigner(WINDOW_DESIGNER*, HINSTANCE);
 void ReleaseWindowDesigner(WINDOW_DESIGNER*);
 BOOL DrawControlHandles(WINDOW_DESIGNER*, HDC, HWND, LONG);
 
+// designer data
 void DesignerAddControl(WINDOW_DESIGNER*, LPCWSTR, LPCWSTR, int, int, int, int);
 void DesignerUpdateMarginBox(WINDOW_DESIGNER*);
 void DesignerClearSelection(WINDOW_DESIGNER*);
 void DesignerResetSelectionToFocus(WINDOW_DESIGNER*, HWND);
 void DesignerAddToSelection(WINDOW_DESIGNER*, HWND);
-int DesignerCompileTemplate(WINDOW_DESIGNER*);
 
+// util
 BOOL IsSubRect(const RECT*, const RECT*);
 LONG IsHoveringOnHandles(WINDOW_DESIGNER*, POINT);
 void MapWindowRectToDesigner(WINDOW_DESIGNER*, RECT*, HWND);
+
+typedef struct {
+	int nStatus;
+	PBYTE pBase;
+	size_t szData;
+	size_t szOffset;
+} DLG_TEMPLATE_BUILD_INFO;
+
+// dialog data
+int DesignerLaunchTemplate(WINDOW_DESIGNER*);

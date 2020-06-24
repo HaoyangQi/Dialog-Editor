@@ -201,20 +201,36 @@ void DesignerAddToSelection(WINDOW_DESIGNER* pwd, HWND hitTarget)
 
 void DesignerResetTemplate(WINDOW_DESIGNER* pwd)
 {
-    // TODO: there is another way: only reset fields, reuse the memory
-    TemplateRelease(pwd->pDlgTemplate);
-    pwd->pDlgTemplate = TemplateCreate();
+    // reset fields, reuse the memory
+    free(pwd->pDlgTemplate->menu);
+    free(pwd->pDlgTemplate->windowClass);
+    free(pwd->pDlgTemplate->title);
+    free(pwd->pDlgTemplate->typeface);
+
+    DIALOG_TEMPLATE_ITEM_DATA* pItem = pwd->pDlgTemplate->pItemBegin, * pTemp;
+    while (pItem) {
+        pTemp = pItem->next;
+        TemplateDeleteByReference(pwd->pDlgTemplate, pItem);
+        pItem = pTemp;
+    }
+    
+    memset(pwd->pDlgTemplate, 0, sizeof(DIALOG_TEMPLATE_DATA));
+    pwd->pDlgTemplate->dlgVer = 1;
+    pwd->pDlgTemplate->signature = 0xFFFF;
+    
+    // this is another way: purge everything and re-allocate
+    //TemplateRelease(pwd->pDlgTemplate);
+    //pwd->pDlgTemplate = TemplateCreate();
 }
 
-// window size would be a little different, because the compiler only preserves the 
-// exact size of the client area, any size difference caused by outlook will be ignored.
-int DesignerCompileTemplate(WINDOW_DESIGNER* pwd)
+// Map designer data to dialog template
+// use DesignerResetTemplate to free mapped data and reset template to empty state
+void DesignerSyncTemplate(WINDOW_DESIGNER* pwd)
 {
     // compile data from designer and fill template
     DESIGNER_CONTROL_ITEM* pci = pwd->listControls->begin;
     DIALOG_TEMPLATE_ITEM_DATA* pItem;
     WINDOWINFO infoWindow;
-    LONG dlgBaseUnitsX, dlgBaseUnitsY;
 
     // use pixel unit to do first pass, unit conversion comes afterwards
     infoWindow.cbSize = sizeof(WINDOWINFO);
@@ -270,7 +286,6 @@ int DesignerCompileTemplate(WINDOW_DESIGNER* pwd)
         GetClassNameW(pci->hwnd, strCtrlClassName, 256);
         DebugPrintf(L"Control Class: %s\n", strCtrlClassName);
         if (!wcscmp(strCtrlClassName, WC_BUTTONW)) {
-            DebugPrintf(L"Button Detected.\n");
             pItem->size_class = sizeof(WCHAR) * 2;
             pItem->windowClass = (WCHAR*)malloc(pItem->size_class);
             pItem->windowClass[0] = 0xFFFF;
@@ -324,32 +339,46 @@ int DesignerCompileTemplate(WINDOW_DESIGNER* pwd)
 
         pci = pci->next;
     }
+}
+
+// compiler will produce final binary data and reset the template
+PBYTE DesignerCompileTemplate(WINDOW_DESIGNER* pwd, DLG_TEMPLATE_BUILD_INFO* build)
+{
+    DIALOG_TEMPLATE_ITEM_DATA* pItem;
+    LONG dlgBaseUnitsX, dlgBaseUnitsY;
+
+    DesignerSyncTemplate(pwd);
 
     // prepare binary data buffer
     // 4 additional bytes are added as guards just in case
-    size_t templateSize = TemplateGetSizeAligned(pwd->pDlgTemplate) + 4;
-    PBYTE pMem = (PBYTE)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, templateSize);
-    if (!pMem) {
-        TemplateRelease(pwd->pDlgTemplate);
-        return DLG_MEM_ALLOC_FAILED;
+    build->szData = TemplateGetSizeAligned(pwd->pDlgTemplate) + 4;
+    build->pBase = (PBYTE)malloc(build->szData);
+    if (!build->pBase) {
+        DesignerResetTemplate(pwd);
+        return NULL;
     }
 
     // Align start of the template to DWORD boundary to make sure 
     // any padding is consistant in both memory and file.
-    PBYTE pTempl = alignToDWORD(pMem, NULL);
-    int result;
+    PBYTE pTempl = alignToDWORD(build->pBase, NULL);
+    build->szOffset = pTempl - build->pBase;
 
     // Dummy-create a dialog to get base units, so sizes can be converted
     pwd->pDlgTemplate->style &= ~WS_VISIBLE;
-    result = TemplateBindDialogData(pMem, pTempl, pwd->pDlgTemplate, templateSize);
+    build->nStatus = TemplateBindDialogData(build->pBase, pTempl, pwd->pDlgTemplate, build->szData);
+    if (build->nStatus != DLG_MEM_SUCCESS) {
+        DesignerResetTemplate(pwd);
+        free(build->pBase);
+        return NULL;
+    }
     HWND dlgContext = CreateDialogIndirectParamW(
         pwd->appInstance, (LPCDLGTEMPLATE)pTempl, pwd->hwndMain, DialogDummyProc, 0);
     RECT rcTest;
     SetRect(&rcTest, 0, 0, 4, 8);
     MapDialogRect(dlgContext, &rcTest);
+    DestroyWindow(dlgContext);
     dlgBaseUnitsX = rcTest.right;
     dlgBaseUnitsY = rcTest.bottom;
-    DestroyWindow(dlgContext);
 
     // Now convert all coordinates and sizes to dialog units
     pItem = pwd->pDlgTemplate->pItemBegin;
@@ -367,33 +396,53 @@ int DesignerCompileTemplate(WINDOW_DESIGNER* pwd)
 
     // Now rebuild template and free internal template
     pwd->pDlgTemplate->style |= WS_VISIBLE;
-    ZeroMemory(pMem, templateSize);
-    result = TemplateBindDialogData(pMem, pTempl, pwd->pDlgTemplate, templateSize);
+    memset(build->pBase, 0, build->szData);
+    build->nStatus = TemplateBindDialogData(build->pBase, pTempl, pwd->pDlgTemplate, build->szData);
+    if (build->nStatus != DLG_MEM_SUCCESS) {
+        free(build->pBase);
+        build->pBase = NULL;
+    }
     DesignerResetTemplate(pwd);
 
-    if (result == DLG_MEM_SUCCESS)
-    {
-        // Do NOT use CreateDialogIndirectParam which creates modless dialog, we want it to 
-        // pause main thread
-        INT_PTR h = DialogBoxIndirectParamW(
-            pwd->appInstance, (LPCDLGTEMPLATE)pTempl, pwd->hwndMain, DialogDummyProc, 0);
-        if (h == -1) {
-            DebugPrintf(L"[DIALOG] Error launching dialog box: %d\n", GetLastError());
+    return build->pBase;
+}
+
+// compile & launch dialog design
+// window size would be a little different, because the compiler only preserves the 
+// exact size of the client area, any size difference caused by outlook will be ignored.
+int DesignerLaunchTemplate(WINDOW_DESIGNER* pwd)
+{
+    DLG_TEMPLATE_BUILD_INFO bi;
+    PBYTE pMem = DesignerCompileTemplate(pwd, &bi);
+
+    switch (bi.nStatus) {
+        case DLG_MEM_SUCCESS:
+        {
+            // Do NOT use CreateDialogIndirectParam, we want it to pause main thread
+            DebugPrintf(L"[DIALOG] Dialog created at: %x (+%d bytes), total %d bytes\n", 
+                pMem, bi.szOffset, bi.szData);
+            INT_PTR h = DialogBoxIndirectParamW(
+                pwd->appInstance, (LPCDLGTEMPLATE)(pMem + bi.szOffset), pwd->hwndMain, DialogDummyProc, 0);
+            if (h == -1) {
+                DebugPrintf(L"[DIALOG] Error launching dialog box: %d\n", GetLastError());
+            }
+            DebugPrintf(L"[DIALOG] Dialog exited: %d\n", h);
+            break;
         }
-        else {
-            DebugPrintf(L"[DIALOG] Dialog successfully exited: %d\n", h);
+        case DLG_MEM_NOT_ALIGNED:
+        {
+            DebugPrintf(L"[DIALOG] Template memory mis-aligned on 4-byte boundary.\n");
+            break;
         }
-    }
-    else if (result == DLG_MEM_NOT_ALIGNED) {
-        OutputDebugStringW(L"[DIALOG] Template memory mis-aligned on 4-byte boundary.\n");
-    }
-    else if (result == DLG_MEM_EXCESS_USAGE) {
-        OutputDebugStringW(L"[DIALOG] Template memory corrupted, data is out of boundary.\n");
+        case DLG_MEM_EXCESS_USAGE:
+        {
+            DebugPrintf(L"[DIALOG] Template memory corrupted, data is out of boundary.\n");
+            break;
+        }
+        default:
+            break;
     }
 
-    if (!HeapFree(GetProcessHeap(), 0, pMem)) {
-        OutputDebugStringW(L"[DIALOG] Failed to free dialog data.\n");
-        result = DLG_MEM_FREE_FAILED;
-    }
-    return result;
+    free(pMem);
+    return bi.nStatus;
 }
