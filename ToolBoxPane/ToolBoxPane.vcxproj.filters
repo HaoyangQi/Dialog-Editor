@@ -24,62 +24,20 @@
     <ClInclude Include="Resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="refactor1.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="designer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="global.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="proc.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="message.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ll.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="dlgdata.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="resdata.h">
+    <ClInclude Include="ToolBoxPane.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="refactor1.cpp">
+    <ClCompile Include="ToolBoxPane.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="designer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="message.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="proc.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="util.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ll.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="control.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="dlgdata.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="res.cpp">
+    <ClCompile Include="view.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="refactor1.rc">
+    <ResourceCompile Include="ToolBoxPane.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
   </ItemGroup>
@@ -87,31 +45,50 @@
     <Image Include="small.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="refactor1.ico">
+    <Image Include="ToolBoxPane.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="res\handle_enable.bmp">
+    <Image Include="res\ctl_btn.bmp">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="res\handle_disable.bmp">
+    <Image Include="res\ctl_check.bmp">
       <Filter>Resource Files</Filter>
     </Image>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="res\move.cur">
+    <Image Include="res\bitmap1.bmp">
       <Filter>Resource Files</Filter>
-    </None>
-    <None Include="res\scale-horizontal.cur">
+    </Image>
+    <Image Include="res\expand.bmp">
       <Filter>Resource Files</Filter>
-    </None>
-    <None Include="res\scale-vertical.cur">
+    </Image>
+    <Image Include="res\collapse.bmp">
       <Filter>Resource Files</Filter>
-    </None>
-    <None Include="res\scale-ne.cur">
+    </Image>
+    <Image Include="res\ctl_ptr.bmp">
       <Filter>Resource Files</Filter>
-    </None>
-    <None Include="res\scale-se.cur">
+    </Image>
+    <Image Include="res\ctl_edit.bmp">
       <Filter>Resource Files</Filter>
-    </None>
+    </Image>
+    <Image Include="res\ctl-combobox.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\ctl_combobox.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\ctl_listbox.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\ctl_picture.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\ctl_radio.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\ctl_hscroll.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\ctl_vscroll.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>
