@@ -9,13 +9,14 @@ void InitToolBoxPane(TOOLBOX_PANE* ptp, HWND hwnd, HINSTANCE hInst)
     InitCommonControls();
 
     HDC hdc;
+    HBITMAP bmp;
     RECT rc;
     hdc = GetDC(hwnd);
     GetClientRect(hwnd, &rc);
 
     ptp->appInstance = hInst;
     ptp->hwnd = hwnd;
-    ptp->fontRoot = CreateFontIndirectW(&ncm.lfMenuFont); // TODO: Make root bold?
+    ptp->fontRoot = CreateFontIndirectW(&ncm.lfMenuFont);
     ptp->fontChild = CreateFontIndirectW(&ncm.lfMenuFont);
     ptp->fontOld = (HFONT)GetCurrentObject(hdc, OBJ_FONT);
     ptp->brBackground = CreateSolidBrush(RGB(37, 37, 38));
@@ -43,8 +44,15 @@ void InitToolBoxPane(TOOLBOX_PANE* ptp, HWND hwnd, HINSTANCE hInst)
     ptp->pvi = NULL;
 
     ptp->hItemImageList = ImageList_Create(measureImageWidth(ptp), measureImageWidth(ptp), ILC_COLOR | ILC_MASK, 0, 0);
-    ptp->hStateImageList = ImageList_LoadBitmap(hInst, MAKEINTRESOURCE(IDB_STATE_COLLAPSE), ptp->dmItemHeight, 0, RGB(255, 0, 255));
-    ImageList_AddMasked(ptp->hStateImageList, LoadBitmap(hInst, MAKEINTRESOURCE(IDB_STATE_EXPAND)), RGB(255, 0, 255));
+    ptp->hStateImageList = ImageList_Create(ptp->dmItemHeight, ptp->dmItemHeight, ILC_COLOR | ILC_MASK, 0, 0);
+    // load collapse state image
+    bmp = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_STATE_COLLAPSE));
+    ToolBoxAddImage(ptp->hStateImageList, bmp, RGB(255, 0, 255));
+    DeleteObject(bmp);
+    // load expand state icon
+    bmp = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_STATE_EXPAND));
+    ToolBoxAddImage(ptp->hStateImageList, bmp, RGB(255, 0, 255));
+    DeleteObject(bmp);
 
     ReleaseDC(hwnd, hdc);
     SetScrollInfo(hwnd, SB_VERT, &ptp->si, TRUE);
@@ -62,6 +70,41 @@ void ReleaseToolBoxPane(TOOLBOX_PANE* ptp)
     ImageList_Destroy(ptp->hItemImageList);
     ImageList_Destroy(ptp->hStateImageList);
     DeleteObject(ptp->brBackground);
+}
+
+int ToolBoxAddImage(HIMAGELIST hImgList, HBITMAP bmp, COLORREF clrTransparent)
+{
+    if (!hImgList || !bmp) {
+        return -1;
+    }
+    
+    HDC hdc, hdcImg, hdcMem;
+    HBITMAP bmpMem;
+    BITMAP image;
+    int w, h, idx;
+
+    ImageList_GetIconSize(hImgList, &w, &h);
+    hdc = GetDC(NULL);
+    bmpMem = CreateCompatibleBitmap(hdc, w, h);
+    hdcImg = CreateCompatibleDC(hdc);
+    hdcMem = CreateCompatibleDC(hdc);
+
+    // stretch
+    GetObject(bmp, sizeof(BITMAP), &image);
+    bmp = (HBITMAP)SelectObject(hdcImg, bmp);
+    bmpMem = (HBITMAP)SelectObject(hdcMem, bmpMem);
+    StretchBlt(hdcMem, 0, 0, w, h, hdcImg, 0, 0, image.bmWidth, image.bmHeight, SRCCOPY);
+    bmp = (HBITMAP)SelectObject(hdcImg, bmp);
+    bmpMem = (HBITMAP)SelectObject(hdcMem, bmpMem);
+
+    idx = ImageList_AddMasked(hImgList, bmpMem, clrTransparent);
+
+    DeleteObject(bmpMem);
+    DeleteDC(hdcImg);
+    DeleteDC(hdcMem);
+    ReleaseDC(NULL, hdc);
+
+    return idx;
 }
 
 void ItemUpdateTextOffset(TOOLBOX_PANE* ptp, VIEW_ITEM* pvi)
@@ -101,32 +144,9 @@ VIEW_ITEM* ItemAppend(TOOLBOX_PANE* ptp, VIEW_ITEM* pvi, LONG idParent, LONG id,
     }
     // image
     if (strImage) {
-        HDC hdc, hdcImg, hdcMem;
-        HBITMAP bmp, bmpMem;
-        BITMAP image;
-        LONG w = measureImageWidth(ptp);
-
-        hdc = GetDC(ptp->hwnd);
-        bmp = LoadBitmapW(ptp->appInstance, strImage);
-        bmpMem = CreateCompatibleBitmap(hdc, w, w);
-        hdcImg = CreateCompatibleDC(hdc);
-        hdcMem = CreateCompatibleDC(hdc);
-
-        // stretch
-        GetObject(bmp, sizeof(BITMAP), &image);
-        bmp = (HBITMAP)SelectObject(hdcImg, bmp);
-        bmpMem = (HBITMAP)SelectObject(hdcMem, bmpMem);
-        StretchBlt(hdcMem, 0, 0, w, w, hdcImg, 0, 0, image.bmWidth, image.bmHeight, SRCCOPY);
-        bmp = (HBITMAP)SelectObject(hdcImg, bmp);
-        bmpMem = (HBITMAP)SelectObject(hdcMem, bmpMem);
-
-        pItem->nImageIndex = ImageList_AddMasked(ptp->hItemImageList, bmpMem, RGB(255, 0, 255));
-
+        HBITMAP bmp = LoadBitmapW(ptp->appInstance, strImage);
+        pItem->nImageIndex = ToolBoxAddImage(ptp->hItemImageList, bmp, RGB(255, 0, 255));
         DeleteObject(bmp);
-        DeleteObject(bmpMem);
-        DeleteDC(hdcImg);
-        DeleteDC(hdcMem);
-        ReleaseDC(ptp->hwnd, hdc);
     }
 
     // update x pos once based on current state

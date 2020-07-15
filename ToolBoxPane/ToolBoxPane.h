@@ -72,6 +72,7 @@ typedef struct {
 
 void InitToolBoxPane(TOOLBOX_PANE* ptp, HWND hwnd, HINSTANCE hInst);
 void ReleaseToolBoxPane(TOOLBOX_PANE* ptp);
+int ToolBoxAddImage(HIMAGELIST hImgList, HBITMAP bmp, COLORREF clrTransparent);
 VIEW_ITEM* ItemAppend(TOOLBOX_PANE* ptp, VIEW_ITEM* pvi, LONG idParent, LONG id, LPCWSTR content, LPCWSTR strImage);
 void ReleaseItemList(VIEW_ITEM* pvi);
 VIEW_ITEM* ToolboxBindViewData(TOOLBOX_PANE* ptp, VIEW_ITEM* pvi, VIEW_ITEM* selectionDefault);
