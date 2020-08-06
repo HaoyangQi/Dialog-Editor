@@ -338,6 +338,11 @@ void OnSize(TOOLBOX_PANE* ptp, LONG w, LONG h)
         SetScrollInfo(ptp->hwnd, SB_VERT, &ptp->si, TRUE);
     }
 
+    RECT rcClient;
+    GetClientRect(ptp->hwnd, &rcClient);
+    w = rcClient.right - rcClient.left;
+    h = rcClient.bottom - rcClient.top;
+
     // update item BB
     if (w != ptp->szPane.cx) {
         VIEW_ITEM* pvi = ptp->pvi;
@@ -349,6 +354,25 @@ void OnSize(TOOLBOX_PANE* ptp, LONG w, LONG h)
 
     ptp->szPane.cx = w;
     ptp->szPane.cy = h;
+
+    if (ptp->pvi)
+    {
+        SCROLLINFO si;
+        si.cbSize = sizeof(SCROLLINFO);
+        si.fMask = SIF_ALL;
+        GetScrollInfo(ptp->hwnd, SB_VERT, &si);
+
+        LONG dy = abs(ptp->pvi->rcItemText.top) - si.nPos;
+        VIEW_ITEM* prop = ptp->pvi;
+
+        while (prop)
+        {
+            OffsetRect(&prop->rcItemText, 0, dy);
+            prop = prop->next;
+        }
+
+        ScrollWindowEx(ptp->hwnd, 0, dy, NULL, NULL, NULL, NULL, SW_ERASE | SW_INVALIDATE);
+    }
 }
 
 void OnScroll(TOOLBOX_PANE* ptp, int scrollType, int lineStep)
@@ -445,6 +469,7 @@ void OnMouseMove(TOOLBOX_PANE* ptp, int x, int y)
     POINT pt = { x, y };
     RECT rc;
     VIEW_ITEM* pvi = ptp->pvi;
+    BOOL bHoverNothing = TRUE;
 
     // fire a mouse track if necessary
     if (!ptp->bMouseTrack) {
@@ -453,6 +478,11 @@ void OnMouseMove(TOOLBOX_PANE* ptp, int x, int y)
 
     while (pvi) {
         SetRect(&rc, 0, pvi->rcItemText.top, pvi->rcItemText.right, pvi->rcItemText.bottom);
+
+        if (PtInRect(&rc, pt)) {
+            bHoverNothing = FALSE;
+        }
+
         if (PtInRect(&rc, pt) && ptp->itemHover != pvi) {
             HDC hdc = GetDC(ptp->hwnd);
 
@@ -482,6 +512,17 @@ void OnMouseMove(TOOLBOX_PANE* ptp, int x, int y)
         }
 
         pvi = ItemGetNext(pvi);
+    }
+
+    if (bHoverNothing && ptp->itemHover && !ptp->itemHover->bSelect) {
+        HDC hdc = GetDC(ptp->hwnd);
+        SetRect(&rc, 0, ptp->itemHover->rcItemText.top,
+            ptp->itemHover->rcItemText.right, ptp->itemHover->rcItemText.bottom);
+        FillRect(hdc, &rc, ptp->brBackground);
+        InvalidateRect(ptp->hwnd, &rc, FALSE);
+        ptp->itemHover->bHover = FALSE;
+        ptp->itemHover = NULL;
+        ReleaseDC(ptp->hwnd, hdc);
     }
 }
 
