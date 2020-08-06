@@ -112,4 +112,3 @@ void ReleasePropertyGridView(PROPERTY_GRID*);
 int PropertyGridAddImage(HIMAGELIST, HBITMAP, COLORREF);
 LONG PropertyGridGetScrollHeight(PROPERTY_GRID*);
 void PropertyGridUpdateScrollRange(PROPERTY_GRID*);
-BOOL PropertyGridMoveDivider(PROPERTY_GRID*, int);

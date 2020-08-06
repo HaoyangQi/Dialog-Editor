@@ -137,17 +137,3 @@ void PropertyGridUpdateScrollRange(PROPERTY_GRID* ppg)
     SetScrollInfo(ppg->hwnd, SB_VERT, &si, TRUE);
     PropertyGridUpdateClientSize(ppg);
 }
-
-BOOL PropertyGridMoveDivider(PROPERTY_GRID* ppg, int dx)
-{
-    if (ppg->posDivider + dx < 20 || ppg->posDivider + dx > ppg->szControl.cy - 20)
-    {
-        return FALSE;
-    }
-
-    ppg->posDivider += dx;
-    RECT rc = { ppg->posDivider, 0, ppg->szControl.cx, ppg->szControl.cy };
-    ScrollWindowEx(ppg->hwnd, dx, 0, &rc, &rc, NULL, NULL, SW_ERASE | SW_INVALIDATE);
-    
-    return TRUE;
-}
