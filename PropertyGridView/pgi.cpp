@@ -41,17 +41,44 @@ PROPERTY_ITEM* PropertyGridItemGetNextVisible(PROPERTY_GRID* ppg, PROPERTY_ITEM*
     return current;
 }
 
-LPWSTR __stdcall PropertyGridItemDefaultVerifier(HPROPERTY hProperty, void* data)
+LPWSTR __stdcall PropertyGridItemDefaultVerifier(void* data, size_t size)
 {
-    return (LPWSTR)data;
+    WCHAR* valueFormatted = NULL;
+
+    if (data)
+    {
+        valueFormatted = (WCHAR*)data;
+
+        if (valueFormatted[size / sizeof(WCHAR) - 1] != '\0')
+        {
+            size += sizeof(WCHAR);
+        }
+
+        valueFormatted = (WCHAR*)malloc(size);
+        if (valueFormatted)
+        {
+            memset(valueFormatted, 0, size);
+            memcpy(valueFormatted, data, size);
+        }
+    }
+    
+    return valueFormatted;
 }
 
-void PropertyGridItemVerify(PROPERTY_ITEM* property)
+void PropertyGridItemVerify(PROPERTY_ITEM* property, void* data, size_t size)
 {
-    LPWSTR value = property->lpfnVerifyProc(property, property->data);
+    LPWSTR value = property->lpfnVerifyProc(data, size);
     if (value)
     {
+        free(property->strValue);
+        free(property->data);
+
         property->strValue = value;
+        property->data = malloc(size);
+        if (property->data)
+        {
+            memcpy(property->data, data, size);
+        }
     }
 }
 

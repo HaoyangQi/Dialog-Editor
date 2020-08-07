@@ -108,6 +108,12 @@ void OnSize(PROPERTY_GRID* ppg, LONG w, LONG h)
 
     // Scroll horizontally to preserve aspect ratio of divider
     LONG dx = ppg->szControl.cx * ppg->aspectRatioDivider - ppg->posDivider;
+    // TODO: fix divider position if scrolling is out of tolerance
+    /*if (0 || ppg->posDivider + dx > ppg->szControl.cx - ppg->dmItemHeight)
+    {
+        ppg->aspectRatioDivider = (float)ppg->posDivider / ppg->szControl.cx;
+        dx = ppg->szControl.cx * ppg->aspectRatioDivider - ppg->posDivider;
+    }*/
     ppg->posDivider = ppg->szControl.cx * ppg->aspectRatioDivider;
     RECT rc = { ppg->posDivider - dx, 0, ppg->szControl.cx, ppg->szControl.cy };
     ScrollWindowEx(ppg->hwnd, dx, 0, &rc, &rc, NULL, NULL, SW_ERASE | SW_INVALIDATE);
@@ -171,6 +177,8 @@ void OnMouseMove(PROPERTY_GRID* ppg, WPARAM virtualKey, int x, int y)
     POINT pt = { x, y };
     PROPERTY_ITEM* property = PropertyGridItemGetFirstVisible(ppg, 0, ppg->szControl.cy);
     int hit = PROP_HIT_NOTHING;
+    LONG dx = x - ppg->ptDragPrevX;
+    LONG posOld = ppg->posDivider;
 
     // Hit test iteration
     while (property)
@@ -200,11 +208,10 @@ void OnMouseMove(PROPERTY_GRID* ppg, WPARAM virtualKey, int x, int y)
         }
     }
 
-    if (ppg->bDragging)
+    if (ppg->bDragging && 
+        posOld + dx >= ppg->dmItemHeight * 2 && // TODO: not good enough
+        posOld + dx <= ppg->szControl.cx - ppg->dmItemHeight)
     {
-        LONG dx = x - ppg->ptDragPrevX;
-        LONG posOld = ppg->posDivider;
-
         // Since paint procedure depends on divider position, 
         // so must update, then scroll
         ppg->posDivider += dx;
@@ -347,13 +354,13 @@ void OnMouseLeftButtonPress(PROPERTY_GRID* ppg, int x, int y)
         case PROP_HIT_KEY:
         {
             DebugPrintf(L"Hit name field: %s, %s.\n", property->strKey, property->strValue);
-            PropertyGridSetSelection(ppg, property);
+            PropertyGridSetSelection(ppg, property, TRUE);
             break;
         }
         case PROP_HIT_VALUE:
         {
             DebugPrintf(L"Hit value field.\n");
-            PropertyGridSetSelection(ppg, property);
+            PropertyGridSetSelection(ppg, property, TRUE);
             break;
         }
         case PROP_HIT_DIVIDER:
@@ -369,6 +376,8 @@ void OnMouseLeftButtonPress(PROPERTY_GRID* ppg, int x, int y)
         default:
         {
             // Some tests are reserved
+            // TODO: for now, we drop changes in this case
+            PropertyGridCancelSelection(ppg, FALSE);
             break;
         }
     }

@@ -28,7 +28,7 @@
 	OutputDebugString(buf); }
 
 typedef void* HPROPERTY;
-typedef LPWSTR (__stdcall *PROCVERIFY)(HPROPERTY, void*);
+typedef LPWSTR (__stdcall *PROCVERIFY)(void*, size_t);
 
 typedef struct property_item {
 	LPWSTR strKey;
@@ -57,12 +57,14 @@ typedef struct property_item {
 typedef struct property_grid {
 	HINSTANCE appInstance;
 	HWND hwnd;
+	HWND hwndValueEdit;
 	HFONT fontBold;
 	HFONT fontRegular;
 	HIMAGELIST hStateImageList;
 	HBRUSH brBackground;
 	HBRUSH brItemFrame;
 
+	COLORREF clrBackground;
 	COLORREF clrTextDefault;
 	COLORREF clrTextDisable;
 	COLORREF clrSelect;
@@ -85,13 +87,15 @@ BOOL PropertyGridAddProperty(PROPERTY_GRID*, HPROPERTY);
 BOOL PropertyGridAddSubItem(PROPERTY_GRID*, HPROPERTY, HPROPERTY);
 void PropertyGridSetVerifier(HPROPERTY, PROCVERIFY, BOOL);
 void PropertyGridDeleteAll(PROPERTY_GRID*);
-void PropertyGridSetSelection(PROPERTY_GRID*, HPROPERTY);
+void PropertyGridCancelSelection(PROPERTY_GRID*, BOOL);
+void PropertyGridSetSelection(PROPERTY_GRID*, HPROPERTY, BOOL);
+void PropertyGridDisableProperty(PROPERTY_GRID*, HPROPERTY, BOOL);
 
 // Item
 PROPERTY_ITEM* PropertyGridItemGetFirstVisible(PROPERTY_GRID*, int, int);
 PROPERTY_ITEM* PropertyGridItemGetNextVisible(PROPERTY_GRID*, PROPERTY_ITEM*, int, int);
-LPWSTR __stdcall PropertyGridItemDefaultVerifier(HPROPERTY, void*);
-void PropertyGridItemVerify(PROPERTY_ITEM*);
+LPWSTR __stdcall PropertyGridItemDefaultVerifier(void*, size_t);
+void PropertyGridItemVerify(PROPERTY_ITEM*, void*, size_t);
 void PropertyGridItemGetIndentionRect(PROPERTY_GRID*, PROPERTY_ITEM*, LPRECT);
 void PropertyGridItemGetKeyRect(PROPERTY_GRID*, PROPERTY_ITEM*, LPRECT);
 void PropertyGridItemGetValueRect(PROPERTY_GRID*, PROPERTY_ITEM*, LPRECT);

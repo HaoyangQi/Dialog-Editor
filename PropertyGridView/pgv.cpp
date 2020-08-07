@@ -32,11 +32,13 @@ void InitPropertyGridView(PROPERTY_GRID* ppg, HWND hwnd, HINSTANCE hInst)
 
     ppg->appInstance = hInst;
     ppg->hwnd = hwnd;
+    ppg->hwndValueEdit = NULL;
     ppg->fontRegular = CreateFontIndirectW(&ncm.lfMenuFont);
     ncm.lfMenuFont.lfWeight = FW_BOLD;
     ppg->fontBold = CreateFontIndirectW(&ncm.lfMenuFont);
     ppg->brBackground = CreateSolidBrush(RGB(37, 37, 38));
     ppg->brItemFrame = CreateSolidBrush(RGB(45, 45, 48));
+    ppg->clrBackground = RGB(37, 37, 38);
     ppg->clrTextDefault = RGB(241, 241, 241);
     ppg->clrTextDisable = RGB(153, 153, 153);
     ppg->clrSelect = RGB(51, 153, 255);
@@ -45,6 +47,7 @@ void InitPropertyGridView(PROPERTY_GRID* ppg, HWND hwnd, HINSTANCE hInst)
     ppg->szControl.cy = rc.bottom - rc.top;
     ppg->aspectRatioDivider = 0.5;
     ppg->posDivider = ppg->szControl.cx * ppg->aspectRatioDivider;
+    ppg->ptDragPrevX = 0;
     ppg->bDragging = FALSE;
 
     // Load image resources

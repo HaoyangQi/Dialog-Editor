@@ -147,11 +147,23 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case WM_LBUTTONUP:
         {
             pgData.bDragging &= 0;
+            break;
+        }
+        case WM_CTLCOLORSTATIC:
+        case WM_CTLCOLOREDIT:
+        {
+            // Value edit control color set up
+            if (pgData.itemSelect)
+            {
+                HDC hdc = (HDC)wParam;
+                SetTextColor(hdc, pgData.itemSelect->clrVal);
+                SetBkColor(hdc, pgData.clrBackground);
+            }
+            return (INT_PTR)(pgData.brBackground);
         }
         case WM_COMMAND:
         {
             int wmId = LOWORD(wParam);
-            // Parse the menu selections:
             switch (wmId)
             {
             case IDM_ABOUT:
@@ -176,18 +188,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 PropertyGridAddSubItem(&pgData, cat2, PropertyGridNewProperty(&pgData, L"Test 5", L"Value 5"));
                 PropertyGridAddSubItem(&pgData, cat2, PropertyGridNewProperty(&pgData, L"Test 6", L"Value 6"));
                 PropertyGridAddProperty(&pgData, cat3);
-                PropertyGridAddSubItem(&pgData, cat3, PropertyGridNewProperty(&pgData, L"Test", L"Value"));
-                PropertyGridAddSubItem(&pgData, cat3, PropertyGridNewProperty(&pgData, L"Test", L"Value"));
-                PropertyGridAddSubItem(&pgData, cat3, PropertyGridNewProperty(&pgData, L"Test", L"Value"));
-                PropertyGridAddSubItem(&pgData, cat3, PropertyGridNewProperty(&pgData, L"Test", L"Value"));
+                PropertyGridAddSubItem(&pgData, cat3, PropertyGridNewProperty(&pgData, L"Test 7", L"Value"));
+                PropertyGridAddSubItem(&pgData, cat3, PropertyGridNewProperty(&pgData, L"Test 8", L"Value"));
+                PropertyGridAddSubItem(&pgData, cat3, PropertyGridNewProperty(&pgData, L"Test 9", L"Value"));
+                PropertyGridAddSubItem(&pgData, cat3, PropertyGridNewProperty(&pgData, L"Test 10", L"Value"));
                 PropertyGridAddProperty(&pgData, cat4);
-                PropertyGridAddSubItem(&pgData, cat4, PropertyGridNewProperty(&pgData, L"Test", L"Value"));
-                PropertyGridAddSubItem(&pgData, cat4, PropertyGridNewProperty(&pgData, L"Test", L"Value"));
-                PropertyGridAddSubItem(&pgData, cat4, PropertyGridNewProperty(&pgData, L"Test", L"Value"));
-                PropertyGridAddSubItem(&pgData, cat4, PropertyGridNewProperty(&pgData, L"Test", L"Value"));
+                PropertyGridAddSubItem(&pgData, cat4, PropertyGridNewProperty(&pgData, L"Test 11", L"Value"));
+                PropertyGridAddSubItem(&pgData, cat4, PropertyGridNewProperty(&pgData, L"Test 12", L"Value"));
+                PropertyGridAddSubItem(&pgData, cat4, PropertyGridNewProperty(&pgData, L"Test 13", L"Value"));
+                PropertyGridAddSubItem(&pgData, cat4, PropertyGridNewProperty(&pgData, L"Test 14", L"Value"));
                 PropertyGridAddSubItem(&pgData, cat2, PropertyGridNewProperty(&pgData, L"Add Test", L"Value"));
                 // Delete Test
-                //PropertyGridDeleteProperty(&pgData, cat3);
+                // PropertyGridDeleteProperty(&pgData, cat3);
+                // Disable Test
+                HPROPERTY propDisable = PropertyGridNewProperty(&pgData, L"(Name Disable)", L"Value Disable");
+                PropertyGridAddSubItem(&pgData, cat3, propDisable);
+                PropertyGridDisableProperty(&pgData, propDisable, TRUE);
                 break;
             }
             default:

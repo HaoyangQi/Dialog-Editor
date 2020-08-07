@@ -22,7 +22,7 @@ HPROPERTY PropertyGridNewProperty(PROPERTY_GRID* ppg, LPCWSTR key, LPCWSTR value
         property->bCollapse = FALSE;
         property->bSelect = FALSE;
         property->bDisable = FALSE;
-        property->bAllowEdit = FALSE;
+        property->bAllowEdit = TRUE;
         property->bVisible = TRUE;
         property->lpfnVerifyProc = PropertyGridItemDefaultVerifier;
         property->data = _wcsdup(value);
@@ -215,10 +215,14 @@ void PropertyGridSetVerifier(HPROPERTY hProperty, PROCVERIFY verifier, BOOL bVal
     {
         property->lpfnVerifyProc = verifier;
     }
+    else
+    {
+        property->lpfnVerifyProc = PropertyGridItemDefaultVerifier;
+    }
 
     if (bValidate)
     {
-        PropertyGridItemVerify(property);
+        PropertyGridItemVerify(property, property->data, property->szData);
     }
 }
 
@@ -234,31 +238,104 @@ void PropertyGridDeleteAll(PROPERTY_GRID* ppg)
     ppg->content = NULL;
 }
 
-void PropertyGridSetSelection(PROPERTY_GRID* ppg, HPROPERTY hProperty)
+void PropertyGridCancelSelection(PROPERTY_GRID* ppg, BOOL bVerify)
+{
+    RECT rc;
+
+    if (ppg->itemSelect)
+    {
+        // Cancel selection
+        ppg->itemSelect->bSelect = FALSE;
+        PropertyGridItemGetKeyRect(ppg, ppg->itemSelect, &rc);
+        InvalidateRect(ppg->hwnd, &rc, TRUE);
+        //PropertyGridItemGetValueRect(ppg, ppg->itemSelect, &rc);
+        //InvalidateRect(ppg->hwnd, &rc, TRUE);
+
+        // TODO: complete edit process and commit changes
+        if (ppg->hwndValueEdit)
+        {
+            if (bVerify)
+            {
+                // verify data
+                int len = GetWindowTextLength(ppg->hwndValueEdit) + 1;
+                WCHAR* buf = (WCHAR*)malloc(len * sizeof(WCHAR));
+
+                if (buf)
+                {
+                    len = GetWindowText(ppg->hwndValueEdit, buf, len);
+                    buf[len] = L'\0';
+                    PropertyGridItemVerify(ppg->itemSelect, buf, len * sizeof(WCHAR));
+                    free(buf);
+                }
+            }
+
+            DestroyWindow(ppg->hwndValueEdit);
+        }
+
+        ppg->itemSelect = NULL;
+    }
+}
+
+void PropertyGridSetSelection(PROPERTY_GRID* ppg, HPROPERTY hProperty, BOOL bVerify)
 {
     PROPERTY_ITEM* property = (PROPERTY_ITEM*)hProperty;
     RECT rc;
 
     if (property != ppg->itemSelect)
     {
-        // Restore previous selection
-        if (ppg->itemSelect)
-        {
-            ppg->itemSelect->bSelect = FALSE;
-            PropertyGridItemGetKeyRect(ppg, ppg->itemSelect, &rc);
-            InvalidateRect(ppg->hwnd, &rc, TRUE);
-            PropertyGridItemGetValueRect(ppg, ppg->itemSelect, &rc);
-            InvalidateRect(ppg->hwnd, &rc, TRUE);
-        }
+        // Cancel previous selection and set to new one
+        PropertyGridCancelSelection(ppg, bVerify);
+        ppg->itemSelect = property;
 
         // Highlight new selection
         property->bSelect = TRUE;
         PropertyGridItemGetKeyRect(ppg, property, &rc);
         InvalidateRect(ppg->hwnd, &rc, TRUE);
         PropertyGridItemGetValueRect(ppg, property, &rc);
-        InvalidateRect(ppg->hwnd, &rc, TRUE);
+        // TODO: as of current, value field is not necessarily redrawn
+        //InvalidateRect(ppg->hwnd, &rc, TRUE);
 
-        // Attach info
-        ppg->itemSelect = property;
+        // Show value edit field
+        // TODO: now only support edit control
+        InflateRect(&rc, -1, -1);
+        ppg->hwndValueEdit = CreateWindow(WC_EDIT, NULL, 
+            WS_CHILD | WS_VISIBLE | ES_LEFT | (property->bAllowEdit ? 0 : ES_READONLY),
+            rc.left + 2, rc.top, rc.right - rc.left, rc.bottom - rc.top,
+            ppg->hwnd, NULL, ppg->appInstance, NULL);
+        // TODO: bold modified text
+        SendMessage(ppg->hwndValueEdit, WM_SETFONT, (WPARAM)(ppg->fontRegular), (LPARAM)0);
+        SetWindowText(ppg->hwndValueEdit, property->strValue);
+        SendMessage(ppg->hwndValueEdit, EM_SETSEL, 0, -1);
+        SetFocus(ppg->hwndValueEdit);
+    }
+}
+
+void PropertyGridDisableProperty(PROPERTY_GRID* ppg, HPROPERTY hProperty, BOOL bDisbale)
+{
+    PROPERTY_ITEM* property = (PROPERTY_ITEM*)hProperty;
+
+    if (property && !isCategory(property) && property->bDisable != bDisbale)
+    {
+        property->bDisable = bDisbale;
+        property->bAllowEdit = !bDisbale;
+        property->clrKey = ppg->clrTextDisable;
+        property->clrVal = ppg->clrTextDisable;
+        InvalidateRect(ppg->hwnd, &property->rcItem, TRUE);
+    }
+}
+
+void PropertyGridSetEditable(PROPERTY_GRID* ppg, HPROPERTY hProperty, BOOL bEditable)
+{
+    PROPERTY_ITEM* property = (PROPERTY_ITEM*)hProperty;
+
+    if (property && !isCategory(property) && property->bAllowEdit != bEditable)
+    {
+        property->bAllowEdit = !bEditable;
+    }
+
+    // If setting selected item, cancel the selection and drop changes
+    if (property == ppg->itemSelect)
+    {
+        PropertyGridCancelSelection(ppg, FALSE);
     }
 }
