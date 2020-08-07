@@ -321,6 +321,12 @@ void OnMouseLeftButtonPress(PROPERTY_GRID* ppg, int x, int y)
                 // if parent is visible and expanding its children, then it is visible
                 current->bVisible = current->parent->bVisible && !current->parent->bCollapse;
 
+                // if selection is collapsed, cancel selection and drop changes
+                if (property->bCollapse && current->bSelect)
+                {
+                    PropertyGridCancelSelection(ppg, FALSE);
+                }
+
                 // visibility is not stable in this context, so calculate using collapse state
                 if (current->parent == property)
                 {

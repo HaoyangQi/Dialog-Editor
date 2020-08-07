@@ -49,6 +49,7 @@ void InitPropertyGridView(PROPERTY_GRID* ppg, HWND hwnd, HINSTANCE hInst)
     ppg->posDivider = ppg->szControl.cx * ppg->aspectRatioDivider;
     ppg->ptDragPrevX = 0;
     ppg->bDragging = FALSE;
+    ppg->procOldEditControl = NULL;
 
     // Load image resources
     ppg->hStateImageList = ImageList_Create(ppg->dmItemHeight, ppg->dmItemHeight, ILC_COLOR | ILC_MASK, 0, 0);

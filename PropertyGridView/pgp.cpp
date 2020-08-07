@@ -4,6 +4,12 @@
 
 #include "PropertyGridView.h"
 
+BOOL isCategory(HPROPERTY hProperty)
+{
+    PROPERTY_ITEM* property = (PROPERTY_ITEM*)hProperty;
+    return property && property->strValue == NULL;
+}
+
 // If *value* is NULL, then it is a category
 HPROPERTY PropertyGridNewProperty(PROPERTY_GRID* ppg, LPCWSTR key, LPCWSTR value)
 {
@@ -34,10 +40,15 @@ HPROPERTY PropertyGridNewProperty(PROPERTY_GRID* ppg, LPCWSTR key, LPCWSTR value
     return property;
 }
 
-PROPERTY_ITEM* PropertyGridReleaseProperty(HPROPERTY hProperty)
+PROPERTY_ITEM* PropertyGridReleaseProperty(PROPERTY_GRID* ppg, HPROPERTY hProperty)
 {
     PROPERTY_ITEM* property = (PROPERTY_ITEM*)hProperty;
     PROPERTY_ITEM* next = property->next;
+
+    if (property->bSelect)
+    {
+        PropertyGridCancelSelection(ppg, FALSE);
+    }
 
     if (property)
     {
@@ -71,7 +82,7 @@ void PropertyGridDeleteProperty(PROPERTY_GRID* ppg, HPROPERTY hProperty)
             while (cur && cur->nLevel > level)
             {
                 deleteHeight += cur->bVisible ? ppg->dmItemHeight : 0;
-                cur = PropertyGridReleaseProperty(cur);
+                cur = PropertyGridReleaseProperty(ppg, cur);
             }
             
             // Detach item
@@ -84,7 +95,7 @@ void PropertyGridDeleteProperty(PROPERTY_GRID* ppg, HPROPERTY hProperty)
                 ppg->content = cur;
             }
 
-            PropertyGridReleaseProperty(property);
+            PropertyGridReleaseProperty(ppg, property);
             deleteHeight += property->bVisible ? ppg->dmItemHeight : 0;
 
             // Update scroll info, redraw
@@ -232,7 +243,7 @@ void PropertyGridDeleteAll(PROPERTY_GRID* ppg)
 
     while (cur)
     {
-        cur = PropertyGridReleaseProperty(cur);
+        cur = PropertyGridReleaseProperty(ppg, cur);
     }
 
     ppg->content = NULL;
@@ -269,6 +280,10 @@ void PropertyGridCancelSelection(PROPERTY_GRID* ppg, BOOL bVerify)
                 }
             }
 
+            if (ppg->procOldEditControl)
+            {
+                SetWindowLongPtr(ppg->hwndValueEdit, GWLP_WNDPROC, (LONG_PTR)(ppg->procOldEditControl));
+            }
             DestroyWindow(ppg->hwndValueEdit);
         }
 
@@ -281,10 +296,14 @@ void PropertyGridSetSelection(PROPERTY_GRID* ppg, HPROPERTY hProperty, BOOL bVer
     PROPERTY_ITEM* property = (PROPERTY_ITEM*)hProperty;
     RECT rc;
 
+    // Cancel previous selection
     if (property != ppg->itemSelect)
     {
-        // Cancel previous selection and set to new one
         PropertyGridCancelSelection(ppg, bVerify);
+    }
+
+    if (property && property != ppg->itemSelect && property->bVisible)
+    {
         ppg->itemSelect = property;
 
         // Highlight new selection
@@ -306,6 +325,7 @@ void PropertyGridSetSelection(PROPERTY_GRID* ppg, HPROPERTY hProperty, BOOL bVer
         SendMessage(ppg->hwndValueEdit, WM_SETFONT, (WPARAM)(ppg->fontRegular), (LPARAM)0);
         SetWindowText(ppg->hwndValueEdit, property->strValue);
         SendMessage(ppg->hwndValueEdit, EM_SETSEL, 0, -1);
+        ppg->procOldEditControl = (WNDPROC)SetWindowLongPtr(ppg->hwndValueEdit, GWLP_WNDPROC, (LONG_PTR)ValueEditSubclassProc);
         SetFocus(ppg->hwndValueEdit);
     }
 }

@@ -13,7 +13,6 @@
 #define PROP_HIT_ITEM 5
 #define PROP_HIT_DIVIDER 6
 
-#define isCategory(item) ((item) && (item)->strValue == NULL)
 #define PropertyGridItemIsVisibleWithin(item, beginY, endY) (\
 	(item) != NULL && \
 	(item)->bVisible && \
@@ -76,11 +75,14 @@ typedef struct property_grid {
 	LONG ptDragPrevX;
 	BOOL bDragging;
 
+	WNDPROC procOldEditControl;
+
 	PROPERTY_ITEM* content;
 	PROPERTY_ITEM* itemSelect;
 } PROPERTY_GRID;
 
 // Public
+BOOL isCategory(HPROPERTY);
 HPROPERTY PropertyGridNewProperty(PROPERTY_GRID*, LPCWSTR, LPCWSTR);
 void PropertyGridDeleteProperty(PROPERTY_GRID*, HPROPERTY);
 BOOL PropertyGridAddProperty(PROPERTY_GRID*, HPROPERTY);
@@ -116,3 +118,6 @@ void ReleasePropertyGridView(PROPERTY_GRID*);
 int PropertyGridAddImage(HIMAGELIST, HBITMAP, COLORREF);
 LONG PropertyGridGetScrollHeight(PROPERTY_GRID*);
 void PropertyGridUpdateScrollRange(PROPERTY_GRID*);
+
+// Subclass
+LRESULT CALLBACK ValueEditSubclassProc(HWND, UINT, WPARAM, LPARAM);

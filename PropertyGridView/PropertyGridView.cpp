@@ -221,6 +221,42 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
+LRESULT CALLBACK ValueEditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    switch (msg)
+    {
+        case WM_KEYDOWN:
+        {
+            switch (wParam)
+            {
+                case VK_RETURN:
+                case VK_TAB:
+                {
+                    HPROPERTY propNext = PropertyGridItemGetNextVisible(&pgData, pgData.itemSelect, 0, pgData.szControl.cy);
+                    while (isCategory(propNext))
+                    {
+                        propNext = PropertyGridItemGetNextVisible(&pgData, (PROPERTY_ITEM*)propNext, 0, pgData.szControl.cy);
+                    }
+
+                    PropertyGridSetSelection(&pgData, propNext, TRUE);
+                    return 0;
+                }
+                case VK_ESCAPE:
+                {
+                    PropertyGridCancelSelection(&pgData, FALSE);
+                    return 0;
+                }
+                default:
+                    break;
+            }
+            // By default, we fall through into old proc, so no break here
+        }
+        default:
+            return CallWindowProc(pgData.procOldEditControl, hwnd, msg, wParam, lParam);
+    }
+    return 0;
+}
+
 // Message handler for about box.
 INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
